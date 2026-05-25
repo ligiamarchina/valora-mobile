@@ -1,7 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 
 import LoginScreen from '../screens/LoginScreen';
@@ -9,7 +9,6 @@ import CadastroScreen from '../screens/CadastroScreen';
 import HomeScreen from '../screens/HomeScreen';
 import LancamentosScreen from '../screens/LancamentosScreen';
 import NovoLancamentoScreen from '../screens/NovoLancamentoScreen';
-import RelatoriosScreen from '../screens/RelatoriosScreen';
 import AlertasScreen from '../screens/AlertasScreen';
 
 const Stack = createNativeStackNavigator();
@@ -20,29 +19,63 @@ function TabsAutenticadas() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#2563EB',
-        tabBarStyle: { paddingBottom: 5 },
+        tabBarActiveTintColor: '#2660A4',
+        tabBarInactiveTintColor: '#94A3B8',
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          borderTopColor: '#E2E8F0',
+          borderTopWidth: 1,
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 6,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
+        },
       }}
     >
       <Tab.Screen
         name="Home"
         component={HomeScreen}
-        options={{ tabBarLabel: 'Início', tabBarIcon: () => <Text>🏠</Text> }}
+        options={{
+          tabBarLabel: 'Início',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? 'home' : 'home-outline'}
+              size={size}
+              color={color}
+            />
+          ),
+        }}
       />
       <Tab.Screen
         name="Lancamentos"
         component={LancamentosScreen}
-        options={{ tabBarLabel: 'Lançamentos', tabBarIcon: () => <Text>💰</Text> }}
-      />
-      <Tab.Screen
-        name="Relatorios"
-        component={RelatoriosScreen}
-        options={{ tabBarLabel: 'Relatórios', tabBarIcon: () => <Text>📊</Text> }}
+        options={{
+          tabBarLabel: 'Lançamentos',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? 'swap-vertical' : 'swap-vertical-outline'}
+              size={size}
+              color={color}
+            />
+          ),
+        }}
       />
       <Tab.Screen
         name="Alertas"
         component={AlertasScreen}
-        options={{ tabBarLabel: 'Alertas', tabBarIcon: () => <Text>🔔</Text> }}
+        options={{
+          tabBarLabel: 'Alertas',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? 'notifications' : 'notifications-outline'}
+              size={size}
+              color={color}
+            />
+          ),
+        }}
       />
     </Tab.Navigator>
   );

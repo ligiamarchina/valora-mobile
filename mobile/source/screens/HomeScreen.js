@@ -8,15 +8,20 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 
 const LARGURA = Dimensions.get('window').width;
-const COR = '#0F766E';
-const COR_BG = '#CCFBF1';
-const COR_TEXTO = '#115E59';
+
+const AZUL    = '#2660A4';
+const AMBAR   = '#ECA400';
+const VERDE   = '#23967F';
+const PRETO   = '#050505';
+const FUNDO   = '#EDF7F6';
+const VERMELHO = '#DC2626';
+const ROXO    = '#7C3AED';
 
 const CATEGORIAS = [
-  { key: 'receita', nome: 'Receitas', cor: '#16A34A', bg: '#DCFCE7', textoCor: '#166534' },
-  { key: 'despesa', nome: 'Despesas', cor: '#DC2626', bg: '#FEE2E2', textoCor: '#991B1B' },
-  { key: 'custo', nome: 'Custos', cor: '#9333EA', bg: '#F3E8FF', textoCor: '#6B21A8' },
-  { key: 'investimento', nome: 'Investimentos', cor: '#CA8A04', bg: '#FEF3C7', textoCor: '#92400E' },
+  { key: 'receita',      nome: 'Receitas',      cor: VERDE,    bg: '#ECFDF5', textoCor: '#065F46' },
+  { key: 'despesa',      nome: 'Despesas',      cor: VERMELHO, bg: '#FEE2E2', textoCor: '#991B1B' },
+  { key: 'custo',        nome: 'Custos',        cor: ROXO,     bg: '#F5F3FF', textoCor: '#5B21B6' },
+  { key: 'investimento', nome: 'Investimentos', cor: AMBAR,    bg: '#FFF8E6', textoCor: '#92400E' },
 ];
 
 export default function HomeScreen() {
@@ -53,7 +58,7 @@ export default function HomeScreen() {
       name: cat.nome,
       population: resumo?.totais?.[cat.key] || 0,
       color: cat.cor,
-      legendFontColor: '#1E293B',
+      legendFontColor: PRETO,
       legendFontSize: 12,
     }))
     .filter((d) => d.population > 0);
@@ -68,7 +73,7 @@ export default function HomeScreen() {
       contentContainerStyle={{ paddingBottom: 32 }}
     >
       {/* Header */}
-      <View style={[s.header, { backgroundColor: COR }]}>
+      <View style={s.header}>
         <View style={s.headerInfo}>
           <Text style={s.ola}>Olá, {usuario?.nome?.split(' ')[0]}</Text>
           <Text style={s.sub}>Resumo financeiro do mês atual</Text>
@@ -80,13 +85,13 @@ export default function HomeScreen() {
       </View>
 
       {carregando ? (
-        <ActivityIndicator color={COR} style={{ marginTop: 80 }} size="large" />
+        <ActivityIndicator color={AZUL} style={{ marginTop: 80 }} size="large" />
       ) : (
         <>
           {/* Card saldo */}
           <View style={[
             s.saldoCard,
-            { backgroundColor: saldoPositivo ? '#115E59' : '#B42318' }
+            { backgroundColor: saldoPositivo ? AZUL : VERMELHO }
           ]}>
             <View style={s.saldoTopo}>
               <Text style={s.saldoLabel}>Saldo do mês</Text>
@@ -135,7 +140,7 @@ export default function HomeScreen() {
                     width={LARGURA - 32}
                     height={220}
                     chartConfig={{
-                      color: (opacity = 1) => `rgba(15, 23, 42, ${opacity})`,
+                      color: (opacity = 1) => `rgba(5, 5, 5, ${opacity})`,
                     }}
                     accessor="population"
                     backgroundColor="transparent"
@@ -192,7 +197,7 @@ export default function HomeScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F1F5F9' },
+  container: { flex: 1, backgroundColor: FUNDO },
 
   header: {
     flexDirection: 'row',
@@ -200,6 +205,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
     paddingTop: 56,
+    backgroundColor: AZUL,
   },
   headerInfo: { flex: 1, paddingRight: 12 },
   ola: { fontSize: 22, fontWeight: 'bold', color: '#fff' },
@@ -273,7 +279,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden',
     borderRadius: 16,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: FUNDO,
     marginBottom: 16,
   },
 
@@ -281,7 +287,7 @@ const s = StyleSheet.create({
   legendaCell: {
     flex: 1,
     minWidth: '45%',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: FUNDO,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#E2E8F0',
@@ -290,7 +296,7 @@ const s = StyleSheet.create({
   legendaTopo: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   legendaDot: { width: 10, height: 10, borderRadius: 999, marginRight: 6 },
   legendaNome: { flex: 1, fontSize: 13, fontWeight: '600', color: '#475569' },
-  legendaValor: { fontSize: 15, fontWeight: '700', color: '#0F172A', marginBottom: 8 },
+  legendaValor: { fontSize: 15, fontWeight: '700', color: PRETO, marginBottom: 8 },
   legendaBadge: {
     alignSelf: 'flex-start',
     paddingHorizontal: 10,
@@ -313,7 +319,7 @@ const s = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 999,
-    backgroundColor: '#94A3B8',
+    backgroundColor: AZUL,
   },
   semDadosTexto: { fontSize: 16, color: '#475569', fontWeight: '700', marginBottom: 6 },
   semDadosSub: { fontSize: 13, color: '#94A3B8', textAlign: 'center', lineHeight: 19 },

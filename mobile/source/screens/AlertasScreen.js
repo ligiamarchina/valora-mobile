@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, Alert, ActivityIndicator,
@@ -8,9 +8,12 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../services/api';
 
-const COR_PRINCIPAL = '#F59E0B';
-const COR_BG = '#FEF9C3';
-const COR_TEXTO = '#92400E';
+const AZUL     = '#2660A4';
+const AZUL_BG  = '#EDF7F6';
+const AMBAR    = '#ECA400';
+const AMBAR_BG = '#FFF8E6';
+const VERDE    = '#23967F';
+const PRETO    = '#050505';
 
 export default function AlertasScreen() {
   const [alertas, setAlertas] = useState([]);
@@ -23,9 +26,8 @@ export default function AlertasScreen() {
   const [menuAberto, setMenuAberto] = useState(null);
 
   const slideAnim = useRef(new Animated.Value(300)).current;
-  const formAnim = useRef(new Animated.Value(0)).current;
+  const formAnim  = useRef(new Animated.Value(0)).current;
 
-  // ── Carregar
   async function carregar() {
     setCarregando(true);
     try {
@@ -52,27 +54,26 @@ export default function AlertasScreen() {
     verificarAlertas();
   }, []));
 
-  // ── Animação formulário
   function toggleForm() {
     if (formAberto) {
-      Animated.timing(formAnim, { toValue: 0, duration: 200, useNativeDriver: false }).start(() => setFormAberto(false));
+      Animated.timing(formAnim, { toValue: 0, duration: 200, useNativeDriver: false })
+        .start(() => setFormAberto(false));
     } else {
       setFormAberto(true);
       Animated.spring(formAnim, { toValue: 1, useNativeDriver: false, bounciness: 4 }).start();
     }
   }
 
-  // ── Bottom sheet
   function abrirMenu(id) {
     setMenuAberto(id);
     Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
   }
 
   function fecharMenu() {
-    Animated.timing(slideAnim, { toValue: 300, duration: 200, useNativeDriver: true }).start(() => setMenuAberto(null));
+    Animated.timing(slideAnim, { toValue: 300, duration: 200, useNativeDriver: true })
+      .start(() => setMenuAberto(null));
   }
 
-  // ── CRUD
   async function criarAlerta() {
     if (!valor) return Alert.alert('Atenção', 'Informe um valor limite.');
     setSalvando(true);
@@ -82,10 +83,8 @@ export default function AlertasScreen() {
         descricao: descricao.trim() || 'Alerta de limite de despesas',
         valor_referencia: parseFloat(valor.replace(',', '.')),
       });
-      setDescricao('');
-      setValor('');
-      toggleForm();
-      carregar();
+      setDescricao(''); setValor('');
+      toggleForm(); carregar();
     } catch {
       Alert.alert('Erro', 'Não foi possível criar o alerta.');
     } finally {
@@ -112,12 +111,8 @@ export default function AlertasScreen() {
         text: 'Excluir', style: 'destructive',
         onPress: async () => {
           setAlertas(prev => prev.filter(a => a.id_alerta !== id));
-          try {
-            await api.delete(`/alertas/${id}`);
-          } catch {
-            Alert.alert('Erro', 'Não foi possível excluir o alerta.');
-            carregar();
-          }
+          try { await api.delete(`/alertas/${id}`); }
+          catch { Alert.alert('Erro', 'Não foi possível excluir.'); carregar(); }
         },
       },
     ]);
@@ -129,7 +124,9 @@ export default function AlertasScreen() {
   }
 
   function dispensarTodasNotificacoes() {
-    notificacoesNovas.forEach(n => api.patch(`/alertas/notificacoes/${n.id_notificacao}/lida`).catch(() => {}));
+    notificacoesNovas.forEach(n =>
+      api.patch(`/alertas/notificacoes/${n.id_notificacao}/lida`).catch(() => {})
+    );
     setNotificacoesNovas([]);
   }
 
@@ -140,48 +137,44 @@ export default function AlertasScreen() {
   }
 
   const fmt = v => `R$ ${parseFloat(v).toFixed(2).replace('.', ',')}`;
-  const ativos = alertas.filter(a => a.ativo);
+  const ativos   = alertas.filter(a => a.ativo);
   const inativos = alertas.filter(a => !a.ativo);
   const alertaSelecionado = alertas.find(a => a.id_alerta === menuAberto);
 
-  // ── Render item
   function renderAlerta({ item }) {
     return (
       <View style={[s.item, !item.ativo && s.itemInativo]}>
-        {/* Barra lateral colorida */}
-        <View style={[s.itemBarra, { backgroundColor: item.ativo ? COR_PRINCIPAL : '#CBD5E1' }]} />
-
-        <View style={s.itemConteudo}>
-          <View style={s.itemTopo}>
-            <View style={[s.itemIconeBox, { backgroundColor: item.ativo ? COR_BG : '#F1F5F9' }]}>
-              <Text style={s.itemIcone}>🔔</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[s.itemDesc, !item.ativo && { color: '#94A3B8' }]} numberOfLines={1}>
-                {item.descricao}
-              </Text>
-              <Text style={[s.itemLimite, { color: item.ativo ? COR_PRINCIPAL : '#94A3B8' }]}>
-                Limite: {fmt(item.valor_referencia)}
-              </Text>
-            </View>
-            <View style={[s.statusBadge, { backgroundColor: item.ativo ? COR_BG : '#F1F5F9' }]}>
-              <Text style={[s.statusTexto, { color: item.ativo ? COR_TEXTO : '#94A3B8' }]}>
-                {item.ativo ? 'Ativo' : 'Inativo'}
-              </Text>
+        <View style={[s.itemAccent, { backgroundColor: item.ativo ? AMBAR : '#CBD5E1' }]} />
+        <View style={s.itemIconeWrap}>
+          <View style={[s.itemIconeBox, { backgroundColor: item.ativo ? AMBAR_BG : '#F1F5F9' }]}>
+            <View style={[s.bellIcon, { borderColor: item.ativo ? AMBAR : '#94A3B8' }]}>
+              <View style={[s.bellDot, { backgroundColor: item.ativo ? AMBAR : '#94A3B8' }]} />
             </View>
           </View>
         </View>
-
-        {/* 3 pontinhos */}
-        <TouchableOpacity
-          style={s.menuBotao}
-          onPress={() => abrirMenu(item.id_alerta)}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <View style={s.dot} />
-          <View style={s.dot} />
-          <View style={s.dot} />
-        </TouchableOpacity>
+        <View style={s.itemConteudo}>
+          <Text style={[s.itemDesc, !item.ativo && { color: '#94A3B8' }]} numberOfLines={1}>
+            {item.descricao}
+          </Text>
+          <Text style={[s.itemLimite, { color: item.ativo ? AMBAR : '#94A3B8' }]}>
+            Limite: {fmt(item.valor_referencia)}
+          </Text>
+        </View>
+        <View style={s.itemDireita}>
+          <View style={[s.statusPill, { backgroundColor: item.ativo ? AMBAR_BG : '#F1F5F9' }]}>
+            <View style={[s.statusDot, { backgroundColor: item.ativo ? VERDE : '#CBD5E1' }]} />
+            <Text style={[s.statusTexto, { color: item.ativo ? '#92400E' : '#94A3B8' }]}>
+              {item.ativo ? 'Ativo' : 'Inativo'}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={s.menuBotao}
+            onPress={() => abrirMenu(item.id_alerta)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <View style={s.dot} /><View style={s.dot} /><View style={s.dot} />
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -190,16 +183,13 @@ export default function AlertasScreen() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={s.container}>
 
-        {/* ── Header */}
-        <View style={[s.header, { backgroundColor: COR_PRINCIPAL }]}>
-          <View style={s.headerCentro}>
-            <Text style={s.headerTitulo}>Alertas Financeiros</Text>
-            <Text style={s.headerSub}>
-              {alertas.length === 0
-                ? 'Nenhum alerta configurado'
-                : `${ativos.length} ativo${ativos.length !== 1 ? 's' : ''} · ${inativos.length} inativo${inativos.length !== 1 ? 's' : ''}`}
-            </Text>
-          </View>
+        <View style={s.header}>
+          <Text style={s.headerTitulo}>Alertas</Text>
+          <Text style={s.headerSub}>
+            {alertas.length === 0
+              ? 'Nenhum alerta configurado'
+              : `${ativos.length} ativo${ativos.length !== 1 ? 's' : ''} · ${inativos.length} inativo${inativos.length !== 1 ? 's' : ''}`}
+          </Text>
         </View>
 
         <FlatList
@@ -207,58 +197,57 @@ export default function AlertasScreen() {
           keyExtractor={item => String(item.id_alerta)}
           contentContainerStyle={s.lista}
           showsVerticalScrollIndicator={false}
-
           ListHeaderComponent={
             <>
-              {/* ── Banner de notificações */}
               {notificacoesNovas.length > 0 && (
                 <View style={s.notifBanner}>
                   <View style={s.notifBannerTopo}>
-                    <Text style={s.notifBannerTitulo}>
-                      🔔 {notificacoesNovas.length} alerta{notificacoesNovas.length !== 1 ? 's' : ''} disparado{notificacoesNovas.length !== 1 ? 's' : ''}
-                    </Text>
+                    <View style={s.notifBannerEsquerda}>
+                      <View style={s.notifIcone} />
+                      <Text style={s.notifBannerTitulo}>
+                        {notificacoesNovas.length} alerta{notificacoesNovas.length !== 1 ? 's' : ''} disparado{notificacoesNovas.length !== 1 ? 's' : ''}
+                      </Text>
+                    </View>
                     <TouchableOpacity onPress={dispensarTodasNotificacoes}>
-                      <Text style={s.notifBannerDescartar}>Descartar tudo</Text>
+                      <Text style={s.notifDescartar}>Limpar</Text>
                     </TouchableOpacity>
                   </View>
                   {notificacoesNovas.map(notif => (
                     <View key={notif.id_notificacao} style={s.notifItem}>
                       <Text style={s.notifItemTexto} numberOfLines={3}>{notif.mensagem}</Text>
-                      <TouchableOpacity onPress={() => dispensarNotificacao(notif.id_notificacao)}>
-                        <Text style={s.notifItemX}>✕</Text>
+                      <TouchableOpacity onPress={() => dispensarNotificacao(notif.id_notificacao)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Text style={s.notifItemX}>×</Text>
                       </TouchableOpacity>
                     </View>
                   ))}
                 </View>
               )}
 
-              {/* ── Stats */}
               {alertas.length > 0 && (
                 <View style={s.statsRow}>
-                  <View style={[s.statCard, { backgroundColor: COR_BG }]}>
-                    <Text style={[s.statValor, { color: COR_PRINCIPAL }]}>{ativos.length}</Text>
+                  <View style={[s.statCard, { borderLeftColor: AMBAR }]}>
+                    <Text style={[s.statValor, { color: AMBAR }]}>{ativos.length}</Text>
                     <Text style={s.statLabel}>Ativos</Text>
                   </View>
-                  <View style={[s.statCard, { backgroundColor: '#F1F5F9' }]}>
+                  <View style={[s.statCard, { borderLeftColor: '#CBD5E1' }]}>
                     <Text style={[s.statValor, { color: '#94A3B8' }]}>{inativos.length}</Text>
                     <Text style={s.statLabel}>Inativos</Text>
                   </View>
-                  <View style={[s.statCard, { backgroundColor: '#DBEAFE' }]}>
-                    <Text style={[s.statValor, { color: '#1D4ED8' }]}>{alertas.length}</Text>
+                  <View style={[s.statCard, { borderLeftColor: AZUL }]}>
+                    <Text style={[s.statValor, { color: AZUL }]}>{alertas.length}</Text>
                     <Text style={s.statLabel}>Total</Text>
                   </View>
                 </View>
               )}
 
-              {/* ── Formulário colapsável */}
               {formAberto && (
-                <Animated.View style={[s.form, { opacity: formAnim, transform: [{ scaleY: formAnim }] }]}>
+                <Animated.View style={[s.form, { opacity: formAnim }]}>
                   <Text style={s.formTitulo}>Novo alerta de limite</Text>
                   <Text style={s.formDesc}>
                     Você será notificado quando suas despesas do mês ultrapassarem o valor definido.
                   </Text>
-
-                  <Text style={s.fieldLabel}>DESCRIÇÃO <Text style={s.opcional}>(opcional)</Text></Text>
+                  <Text style={s.fieldLabel}>Descrição <Text style={s.opcional}>(opcional)</Text></Text>
                   <TextInput
                     style={s.input}
                     placeholder="Ex: Limite mensal de gastos"
@@ -266,12 +255,11 @@ export default function AlertasScreen() {
                     value={descricao}
                     onChangeText={setDescricao}
                   />
-
-                  <Text style={s.fieldLabel}>LIMITE DE DESPESAS</Text>
-                  <View style={[s.valorBox, { borderColor: COR_PRINCIPAL }]}>
-                    <Text style={[s.valorCifrao, { color: COR_PRINCIPAL }]}>R$</Text>
+                  <Text style={s.fieldLabel}>Limite de despesas</Text>
+                  <View style={s.valorBox}>
+                    <Text style={s.valorCifrao}>R$</Text>
                     <TextInput
-                      style={[s.valorInput, { color: COR_PRINCIPAL }]}
+                      style={s.valorInput}
                       placeholder="0,00"
                       placeholderTextColor="#CBD5E1"
                       value={valor}
@@ -279,39 +267,35 @@ export default function AlertasScreen() {
                       keyboardType="numeric"
                     />
                   </View>
-
                   <TouchableOpacity
-                    style={[s.botaoCriar, { backgroundColor: COR_PRINCIPAL }, salvando && { opacity: 0.6 }]}
+                    style={[s.botaoCriar, salvando && { opacity: 0.6 }]}
                     onPress={criarAlerta}
                     disabled={salvando}
                   >
                     {salvando
                       ? <ActivityIndicator color="#fff" size="small" />
-                      : <Text style={s.botaoCriarTexto}>Criar alerta 🔔</Text>
+                      : <Text style={s.botaoCriarTexto}>Criar alerta</Text>
                     }
                   </TouchableOpacity>
                 </Animated.View>
               )}
 
-              {alertas.length > 0 && (
-                <Text style={s.listaLabel}>SEUS ALERTAS</Text>
-              )}
+              {alertas.length > 0 && <Text style={s.listaLabel}>Seus alertas</Text>}
             </>
           }
 
           ListEmptyComponent={
             !carregando ? (
               <View style={s.vazio}>
-                <Text style={s.vazioIcone}>🔕</Text>
-                <Text style={s.vazioTitulo}>Nenhum alerta ainda</Text>
+                <View style={s.vazioIconeCircle}>
+                  <View style={s.vazioIconeBell} />
+                </View>
+                <Text style={s.vazioTitulo}>Nenhum alerta configurado</Text>
                 <Text style={s.vazioDesc}>
-                  Crie um alerta para ser notificado quando suas despesas ultrapassarem um limite.
+                  Crie um alerta para ser notificado quando suas despesas ultrapassarem um limite definido por você.
                 </Text>
-                <TouchableOpacity
-                  style={[s.botaoCriarVazio, { backgroundColor: COR_PRINCIPAL }]}
-                  onPress={toggleForm}
-                >
-                  <Text style={s.botaoCriarVazioTexto}>+ Criar primeiro alerta</Text>
+                <TouchableOpacity style={s.botaoCriarVazio} onPress={toggleForm}>
+                  <Text style={s.botaoCriarVazioTexto}>Criar primeiro alerta</Text>
                 </TouchableOpacity>
               </View>
             ) : null
@@ -320,54 +304,61 @@ export default function AlertasScreen() {
           renderItem={renderAlerta}
         />
 
-        {/* ── Botão flutuante novo alerta */}
         <TouchableOpacity
-          style={[s.fab, { backgroundColor: formAberto ? '#64748B' : COR_PRINCIPAL }]}
+          style={[s.fab, formAberto && s.fabCancelar]}
           onPress={toggleForm}
         >
-          <Text style={s.fabTexto}>{formAberto ? '✕ Cancelar' : '+ Novo alerta'}</Text>
+          <Text style={s.fabTexto}>{formAberto ? 'Cancelar' : '+ Novo alerta'}</Text>
         </TouchableOpacity>
 
-        {carregando && (
-          <ActivityIndicator color={COR_PRINCIPAL} style={s.loader} size="large" />
-        )}
-
+        {carregando && <ActivityIndicator color={AZUL} style={s.loader} size="large" />}
       </View>
 
-      {/* ── Bottom sheet de opções */}
       <Modal visible={menuAberto !== null} transparent animationType="none">
         <TouchableWithoutFeedback onPress={fecharMenu}>
           <View style={s.overlay}>
             <TouchableWithoutFeedback>
               <Animated.View style={[s.sheet, { transform: [{ translateY: slideAnim }] }]}>
-
                 <View style={s.sheetHandle} />
-
                 {alertaSelecionado && (
-                  <View style={s.sheetInfo}>
-                    <View style={[s.sheetIconeBox, { backgroundColor: alertaSelecionado.ativo ? COR_BG : '#F1F5F9' }]}>
-                      <Text style={{ fontSize: 22 }}>🔔</Text>
+                  <>
+                    <View style={s.sheetInfo}>
+                      <View style={[s.sheetIconeBox, { backgroundColor: alertaSelecionado.ativo ? AMBAR_BG : '#F1F5F9' }]}>
+                        <View style={[s.bellIcon, { borderColor: alertaSelecionado.ativo ? AMBAR : '#94A3B8' }]}>
+                          <View style={[s.bellDot, { backgroundColor: alertaSelecionado.ativo ? AMBAR : '#94A3B8' }]} />
+                        </View>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.sheetDescricao} numberOfLines={1}>{alertaSelecionado.descricao}</Text>
+                        <Text style={[s.sheetLimite, { color: AMBAR }]}>
+                          Limite: {fmt(alertaSelecionado.valor_referencia)}
+                        </Text>
+                      </View>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.sheetDescricao} numberOfLines={1}>{alertaSelecionado.descricao}</Text>
-                      <Text style={[s.sheetLimite, { color: COR_PRINCIPAL }]}>
-                        Limite: {fmt(alertaSelecionado.valor_referencia)}
-                      </Text>
-                    </View>
-                  </View>
+                    <View style={s.sheetDivisor} />
+                  </>
                 )}
 
-                <View style={s.sheetDivisor} />
-
-                {/* Toggle ativar/desativar */}
                 {alertaSelecionado && (
                   <Pressable
-                    style={({ pressed }) => [s.sheetOpcao, { backgroundColor: alertaSelecionado.ativo ? '#F0FDF4' : COR_BG }, pressed && { opacity: 0.75 }]}
+                    style={({ pressed }) => [
+                      s.sheetOpcao,
+                      { backgroundColor: alertaSelecionado.ativo ? '#ECFDF5' : AMBAR_BG },
+                      pressed && { opacity: 0.75 }
+                    ]}
                     onPress={() => toggleAlerta(menuAberto, alertaSelecionado.ativo)}
                   >
-                    <Text style={s.sheetOpcaoIcone}>{alertaSelecionado.ativo ? '🔕' : '🔔'}</Text>
+                    <View style={[s.sheetOpcaoIconeBox, {
+                      backgroundColor: alertaSelecionado.ativo ? '#D1FAE5' : '#FEF3C7'
+                    }]}>
+                      <View style={[s.sheetOpcaoIconeDot, {
+                        backgroundColor: alertaSelecionado.ativo ? VERDE : AMBAR
+                      }]} />
+                    </View>
                     <View>
-                      <Text style={[s.sheetOpcaoTexto, { color: alertaSelecionado.ativo ? '#16A34A' : COR_PRINCIPAL }]}>
+                      <Text style={[s.sheetOpcaoTexto, {
+                        color: alertaSelecionado.ativo ? VERDE : AMBAR
+                      }]}>
                         {alertaSelecionado.ativo ? 'Desativar alerta' : 'Ativar alerta'}
                       </Text>
                       <Text style={s.sheetOpcaoSub}>
@@ -377,171 +368,164 @@ export default function AlertasScreen() {
                   </Pressable>
                 )}
 
-                {/* Excluir */}
                 <Pressable
                   style={({ pressed }) => [s.sheetOpcao, { backgroundColor: '#FFF5F5', marginTop: 8 }, pressed && { opacity: 0.75 }]}
                   onPress={() => excluirAlerta(menuAberto)}
                 >
-                  <Text style={s.sheetOpcaoIcone}>🗑️</Text>
+                  <View style={[s.sheetOpcaoIconeBox, { backgroundColor: '#FEE2E2' }]}>
+                    <View style={s.sheetOpcaoIconeMenos} />
+                  </View>
                   <View>
                     <Text style={[s.sheetOpcaoTexto, { color: '#DC2626' }]}>Excluir alerta</Text>
                     <Text style={s.sheetOpcaoSub}>Esta ação não pode ser desfeita</Text>
                   </View>
                 </Pressable>
 
-                {/* Cancelar */}
                 <Pressable
                   style={({ pressed }) => [s.sheetCancelar, pressed && { opacity: 0.75 }]}
                   onPress={fecharMenu}
                 >
                   <Text style={s.sheetCancelarTexto}>Cancelar</Text>
                 </Pressable>
-
               </Animated.View>
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
       </Modal>
-
     </KeyboardAvoidingView>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F1F5F9' },
-
-  // ── Header
+  container: { flex: 1, backgroundColor: '#EDF7F6' },
   header: {
+    backgroundColor: '#fff',
     paddingTop: Platform.OS === 'ios' ? 56 : (StatusBar.currentHeight ?? 24) + 12,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-    alignItems: 'center',
+    paddingBottom: 20, paddingHorizontal: 24,
+    borderBottomWidth: 1, borderColor: '#E2E8F0',
   },
-  headerCentro: { alignItems: 'center' },
-  headerIcone: { fontSize: 32, marginBottom: 6 },
-  headerTitulo: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
-  headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
-
-  // ── Lista
+  headerTitulo: { fontSize: 26, fontWeight: 'bold', color: PRETO },
+  headerSub: { fontSize: 13, color: '#94A3B8', marginTop: 4 },
   lista: { padding: 16, paddingBottom: 100 },
-
-  listaLabel: {
-    fontSize: 11, fontWeight: '700', color: '#94A3B8',
-    letterSpacing: 1, marginBottom: 10, marginTop: 4,
-  },
-
   loader: { marginTop: 60 },
-
-  // ── Stats
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  statCard: { flex: 1, borderRadius: 16, padding: 14, alignItems: 'center' },
-  statValor: { fontSize: 22, fontWeight: 'bold', marginBottom: 2 },
-  statLabel: { fontSize: 12, color: '#64748B', fontWeight: '500' },
-
-  // ── Banner notificações
-  notifBanner: {
-    backgroundColor: '#FFF7ED', borderLeftWidth: 4, borderLeftColor: COR_PRINCIPAL,
-    borderRadius: 16, padding: 16, marginBottom: 16,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
+  statCard: {
+    flex: 1, backgroundColor: '#fff', borderRadius: 14,
+    padding: 14, borderLeftWidth: 3,
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
   },
-  notifBannerTopo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  notifBannerTitulo: { fontSize: 14, fontWeight: '700', color: '#92400E' },
-  notifBannerDescartar: { fontSize: 13, color: '#B45309', fontWeight: '600' },
+  statValor: { fontSize: 22, fontWeight: 'bold', marginBottom: 2 },
+  statLabel: { fontSize: 12, color: '#64748B' },
+  notifBanner: {
+    backgroundColor: AMBAR_BG, borderRadius: 16, padding: 16,
+    marginBottom: 16, borderWidth: 1, borderColor: '#FDE68A',
+  },
+  notifBannerTopo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  notifBannerEsquerda: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  notifIcone: { width: 8, height: 8, borderRadius: 999, backgroundColor: AMBAR },
+  notifBannerTitulo: { fontSize: 13, fontWeight: '700', color: '#92400E' },
+  notifDescartar: { fontSize: 13, color: '#B45309', fontWeight: '600' },
   notifItem: {
-    flexDirection: 'row', alignItems: 'flex-start', backgroundColor: '#FFFBEB',
-    borderRadius: 10, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#FDE68A', gap: 8,
+    flexDirection: 'row', alignItems: 'flex-start',
+    backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 6, gap: 8,
   },
   notifItemTexto: { flex: 1, fontSize: 13, color: '#78350F', lineHeight: 18 },
-  notifItemX: { fontSize: 14, color: '#B45309', fontWeight: '700', paddingHorizontal: 4 },
-
-  // ── Formulário
+  notifItemX: { fontSize: 18, color: '#B45309', fontWeight: '400', lineHeight: 20 },
   form: {
     backgroundColor: '#fff', borderRadius: 20, padding: 20, marginBottom: 20,
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,
-    transformOrigin: 'top',
   },
-  formTitulo: { fontSize: 16, fontWeight: '700', color: '#1E293B', marginBottom: 4 },
-  formDesc: { fontSize: 13, color: '#64748B', marginBottom: 20, lineHeight: 18 },
-  fieldLabel: { fontSize: 11, fontWeight: '700', color: '#475569', letterSpacing: 0.5, marginBottom: 8, textTransform: 'uppercase' },
-  opcional: { fontSize: 11, color: '#94A3B8', fontWeight: '400', textTransform: 'none' },
+  formTitulo: { fontSize: 16, fontWeight: '700', color: PRETO, marginBottom: 4 },
+  formDesc: { fontSize: 13, color: '#64748B', marginBottom: 20, lineHeight: 19 },
+  fieldLabel: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 8 },
+  opcional: { fontSize: 12, color: '#94A3B8', fontWeight: '400' },
   input: {
     backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: '#E2E8F0',
-    borderRadius: 14, padding: 14, fontSize: 15, color: '#1E293B', marginBottom: 16,
+    borderRadius: 12, padding: 14, fontSize: 15, color: PRETO, marginBottom: 16,
   },
   valorBox: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#F8FAFC', borderRadius: 14,
-    borderWidth: 2, paddingHorizontal: 16, marginBottom: 16,
+    backgroundColor: '#F8FAFC', borderRadius: 12,
+    borderWidth: 1.5, borderColor: AMBAR,
+    paddingHorizontal: 16, marginBottom: 16,
   },
-  valorCifrao: { fontSize: 18, fontWeight: '700', marginRight: 8 },
-  valorInput: { flex: 1, fontSize: 28, fontWeight: 'bold', paddingVertical: 14 },
-  botaoCriar: {
-    borderRadius: 14, padding: 16, alignItems: 'center',
-    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 6, elevation: 3,
+  valorCifrao: { fontSize: 16, fontWeight: '700', color: AMBAR, marginRight: 8 },
+  valorInput: { flex: 1, fontSize: 26, fontWeight: 'bold', paddingVertical: 14, color: PRETO },
+  botaoCriar: { backgroundColor: AZUL, borderRadius: 12, padding: 16, alignItems: 'center' },
+  botaoCriarTexto: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  listaLabel: {
+    fontSize: 12, fontWeight: '700', color: '#94A3B8',
+    letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10, marginTop: 4,
   },
-  botaoCriarTexto: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-
-  // ── Item
   item: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
     borderRadius: 16, marginBottom: 10, overflow: 'hidden',
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
   },
-  itemInativo: { opacity: 0.6 },
-  itemBarra: { width: 4, alignSelf: 'stretch' },
-  itemConteudo: { flex: 1, padding: 14 },
-  itemTopo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  itemInativo: { opacity: 0.55 },
+  itemAccent: { width: 4, alignSelf: 'stretch' },
+  itemIconeWrap: { paddingLeft: 14, paddingVertical: 14 },
   itemIconeBox: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  itemIcone: { fontSize: 20 },
-  itemDesc: { fontSize: 14, fontWeight: '600', color: '#1E293B', marginBottom: 2 },
+  bellIcon: {
+    width: 18, height: 16, borderWidth: 2, borderRadius: 8,
+    borderBottomLeftRadius: 2, borderBottomRightRadius: 2,
+    alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 1,
+  },
+  bellDot: { width: 4, height: 4, borderRadius: 999, marginBottom: -3 },
+  itemConteudo: { flex: 1, paddingHorizontal: 12, paddingVertical: 14 },
+  itemDesc: { fontSize: 14, fontWeight: '600', color: PRETO, marginBottom: 3 },
   itemLimite: { fontSize: 13, fontWeight: '700' },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
+  itemDireita: { paddingRight: 8, alignItems: 'flex-end', gap: 8 },
+  statusPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
+  },
+  statusDot: { width: 6, height: 6, borderRadius: 999 },
   statusTexto: { fontSize: 11, fontWeight: '700' },
-
-  // ── 3 pontinhos
-  menuBotao: { paddingHorizontal: 14, paddingVertical: 16, gap: 3, alignItems: 'center' },
+  menuBotao: { padding: 8, gap: 3, alignItems: 'center' },
   dot: { width: 4, height: 4, borderRadius: 999, backgroundColor: '#CBD5E1' },
-
-  // ── FAB
   fab: {
     position: 'absolute', bottom: 24, left: 24, right: 24,
-    borderRadius: 16, padding: 16, alignItems: 'center',
+    backgroundColor: AZUL, borderRadius: 14, padding: 16, alignItems: 'center',
     shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 10, elevation: 5,
   },
-  fabTexto: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-
-  // ── Estado vazio
+  fabCancelar: { backgroundColor: '#64748B' },
+  fabTexto: { color: '#fff', fontWeight: '700', fontSize: 15 },
   vazio: { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 32 },
-  vazioIcone: { fontSize: 52, marginBottom: 16 },
-  vazioTitulo: { fontSize: 18, fontWeight: 'bold', color: '#1E293B', marginBottom: 8 },
+  vazioIconeCircle: {
+    width: 72, height: 72, borderRadius: 36, backgroundColor: AMBAR_BG,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 20,
+  },
+  vazioIconeBell: {
+    width: 28, height: 24, borderWidth: 3, borderColor: AMBAR,
+    borderRadius: 12, borderBottomLeftRadius: 4, borderBottomRightRadius: 4,
+  },
+  vazioTitulo: { fontSize: 18, fontWeight: '700', color: PRETO, marginBottom: 10 },
   vazioDesc: { fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 20, marginBottom: 24 },
-  botaoCriarVazio: { paddingHorizontal: 24, paddingVertical: 14, borderRadius: 14 },
-  botaoCriarVazioTexto: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-
-  // ── Overlay / Bottom sheet
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  botaoCriarVazio: { backgroundColor: AZUL, paddingHorizontal: 28, paddingVertical: 14, borderRadius: 12 },
+  botaoCriarVazioTexto: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
     padding: 20, paddingBottom: 36,
   },
   sheetHandle: {
-    width: 40, height: 4, borderRadius: 999,
+    width: 36, height: 4, borderRadius: 999,
     backgroundColor: '#E2E8F0', alignSelf: 'center', marginBottom: 20,
   },
   sheetInfo: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
   sheetIconeBox: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  sheetDescricao: { fontSize: 15, fontWeight: '700', color: '#1E293B' },
+  sheetDescricao: { fontSize: 15, fontWeight: '700', color: PRETO },
   sheetLimite: { fontSize: 13, fontWeight: '600', marginTop: 2 },
-  sheetDivisor: { height: 1, backgroundColor: '#F1F5F9', marginBottom: 10 },
-  sheetOpcao: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    padding: 16, borderRadius: 14,
-  },
-  sheetOpcaoIcone: { fontSize: 22 },
+  sheetDivisor: { height: 1, backgroundColor: '#F1F5F9', marginBottom: 12 },
+  sheetOpcao: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 14 },
+  sheetOpcaoIconeBox: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  sheetOpcaoIconeDot: { width: 14, height: 14, borderRadius: 999 },
+  sheetOpcaoIconeMenos: { width: 14, height: 3, borderRadius: 999, backgroundColor: '#DC2626' },
   sheetOpcaoTexto: { fontSize: 15, fontWeight: '700' },
   sheetOpcaoSub: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
   sheetCancelar: {
-    padding: 16, borderRadius: 14, backgroundColor: '#F1F5F9',
+    padding: 16, borderRadius: 14, backgroundColor: '#F8FAFC',
     alignItems: 'center', marginTop: 8,
   },
   sheetCancelarTexto: { fontSize: 15, fontWeight: '600', color: '#64748B' },

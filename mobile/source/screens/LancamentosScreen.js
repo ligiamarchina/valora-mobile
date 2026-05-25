@@ -1,31 +1,51 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  ActivityIndicator, Alert, Modal, Animated,
-  TouchableWithoutFeedback, Pressable, Platform, StatusBar,
+  ActivityIndicator, Alert, Modal, Platform, StatusBar, Pressable
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { Calendar } from 'react-native-calendars';
 import api from '../services/api';
 
-const COR = '#2563EB';
-const COR_BG = '#DBEAFE';
-const COR_TEXTO = '#1E40AF';
+const AZUL    = '#2660A4';
+const AMBAR   = '#ECA400';
+const VERDE   = '#23967F';
+const PRETO   = '#050505';
+const FUNDO   = '#EDF7F6';
+const VERMELHO = '#DC2626';
+const ROXO    = '#7C3AED';
 
-const CORES     = { receita: '#16A34A', despesa: '#DC2626', investimento: '#CA8A04', custo: '#9333EA' };
-const CORES_BG  = { receita: '#DCFCE7', despesa: '#FEE2E2', investimento: '#FEF9C3', custo: '#F3E8FF' };
-const LABELS    = { receita: 'Receita',  despesa: 'Despesa',  investimento: 'Investimento',  custo: 'Custo' };
+const CORES = { receita: VERDE, despesa: VERMELHO, investimento: AMBAR, custo: ROXO };
+const CORES_BG = { receita: '#ECFDF5', despesa: '#FEE2E2', investimento: '#FFF8E6', custo: '#F5F3FF' };
+const LABELS = { receita: 'Receita', despesa: 'Despesa', investimento: 'Investimento', custo: 'Custo' };
+
+const fmt = (v) => `R$ ${(v ?? 0).toFixed(2).replace('.', ',')}`;
+const fmtData = (d) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : null;
+
+function calcularTotais(lancamentos) {
+  const totais = { receita: 0, despesa: 0, custo: 0, investimento: 0 };
+  lancamentos.forEach(l => { totais[l.tipo] += parseFloat(l.valor); });
+  return { ...totais, saldo: totais.receita - totais.despesa - totais.custo - totais.investimento };
+}
 
 export default function LancamentosScreen({ navigation }) {
-  const [lancamentos, setLancamentos]   = useState([]);
-  const [carregando, setCarregando]     = useState(true);
-  const [excluindo, setExcluindo]       = useState(null);
-  const [menuAberto, setMenuAberto]     = useState(null);
-  const slideAnim = useRef(new Animated.Value(300)).current;
+  const [lancamentos, setLancamentos] = useState([]);
+  const [carregando, setCarregando]   = useState(true);
+  const [excluindo, setExcluindo]     = useState(null);
+  const [mostrarCalInicio, setMostrarCalInicio] = useState(false);
+  const [mostrarCalFim, setMostrarCalFim]       = useState(false);
+
+  const hoje = new Date();
+  const primeiroDia = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`;
+  const ultimoDia   = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate()}`;
+
+  const [dataInicio, setDataInicio] = useState(primeiroDia);
+  const [dataFim, setDataFim]       = useState(ultimoDia);
 
   async function carregar() {
     setCarregando(true);
     try {
-      const { data } = await api.get('/lancamentos');
+      const { data } = await api.get(`/lancamentos?data_inicio=${dataInicio}&data_fim=${dataFim}`);
       setLancamentos(data);
     } catch {
       Alert.alert('Erro', 'Não foi possível carregar os lançamentos.');
@@ -34,20 +54,9 @@ export default function LancamentosScreen({ navigation }) {
     }
   }
 
-  useFocusEffect(useCallback(() => { carregar(); }, []));
-
-  function abrirMenu(id) {
-    setMenuAberto(id);
-    Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
-  }
-
-  function fecharMenu() {
-    Animated.timing(slideAnim, { toValue: 300, duration: 200, useNativeDriver: true })
-      .start(() => setMenuAberto(null));
-  }
+  useFocusEffect(useCallback(() => { carregar(); }, [dataInicio, dataFim]));
 
   async function excluir(id) {
-    fecharMenu();
     Alert.alert('Excluir lançamento', 'Esta ação não pode ser desfeita.', [
       { text: 'Cancelar', style: 'cancel' },
       {
@@ -58,68 +67,50 @@ export default function LancamentosScreen({ navigation }) {
             await api.delete(`/lancamentos/${id}`);
             setLancamentos(prev => prev.filter(l => l.id_lancamento !== id));
           } catch {
-            Alert.alert('Erro', 'Não foi possível excluir o lançamento.');
+            Alert.alert('Erro', 'Não foi possível excluir.');
           } finally {
             setExcluindo(null);
           }
-        },
+        }
       },
     ]);
   }
 
-  // ── Stats resumo
-  const totalReceitas    = lancamentos.filter(l => l.tipo === 'receita').reduce((a, l) => a + parseFloat(l.valor), 0);
-  const totalSaidas      = lancamentos.filter(l => l.tipo !== 'receita').reduce((a, l) => a + parseFloat(l.valor), 0);
-  const fmt = v => `R$ ${(v ?? 0).toFixed(2).replace('.', ',')}`;
-
-  const lancamentoSelecionado = lancamentos.find(l => l.id_lancamento === menuAberto);
+  const totais = calcularTotais(lancamentos);
+  const saldoPositivo = totais.saldo >= 0;
 
   function renderItem({ item }) {
     const isExcluindo = excluindo === item.id_lancamento;
-    const cor   = CORES[item.tipo];
-    const corBg = CORES_BG[item.tipo];
-
     return (
       <View style={s.item}>
-        <View style={[s.itemBarra, { backgroundColor: cor }]} />
-
-        <View style={[s.itemIcone, { backgroundColor: corBg }]}>
-          <View style={[s.itemDot, { backgroundColor: cor }]} />
+        <View style={[s.itemAccent, { backgroundColor: CORES[item.tipo] }]} />
+        <View style={[s.itemIcone, { backgroundColor: CORES_BG[item.tipo] }]}>
+          <View style={[s.itemIconeDot, { backgroundColor: CORES[item.tipo] }]} />
         </View>
-
         <View style={s.itemInfo}>
-          <Text style={s.itemDesc} numberOfLines={1}>
-            {item.descricao || item.categoria?.nome || LABELS[item.tipo]}
+          <Text style={s.itemDesc}>{item.descricao || item.categoria?.nome || LABELS[item.tipo]}</Text>
+          <Text style={s.itemCategoria}>{item.categoria?.nome}</Text>
+          <Text style={s.itemData}>
+            {new Date(item.data_lancamento + 'T12:00:00').toLocaleDateString('pt-BR')}
           </Text>
-          <View style={s.itemMetaRow}>
-            {item.categoria?.nome && (
-              <View style={[s.catBadge, { backgroundColor: corBg }]}>
-                <Text style={[s.catBadgeTexto, { color: cor }]}>{item.categoria.nome}</Text>
-              </View>
-            )}
-            <Text style={s.itemData}>
-              {new Date(item.data_lancamento + 'T12:00:00').toLocaleDateString('pt-BR')}
-            </Text>
-          </View>
         </View>
-
         <View style={s.itemDireita}>
-          <Text style={[s.itemValor, { color: cor }]}>
-            {item.tipo === 'receita' ? '+' : '−'} {fmt(parseFloat(item.valor))}
+          <View style={[s.tipoPill, { backgroundColor: CORES_BG[item.tipo] }]}>
+            <Text style={[s.tipoTexto, { color: CORES[item.tipo] }]}>{LABELS[item.tipo]}</Text>
+          </View>
+          <Text style={[s.itemValor, { color: CORES[item.tipo] }]}>
+            {fmt(parseFloat(item.valor))}
           </Text>
-          {isExcluindo ? (
-            <ActivityIndicator size="small" color="#94A3B8" style={{ marginTop: 6 }} />
-          ) : (
-            <TouchableOpacity
-              style={s.menuBotao}
-              onPress={() => abrirMenu(item.id_lancamento)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <View style={s.dot} />
-              <View style={s.dot} />
-              <View style={s.dot} />
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={s.excluirBotao}
+            onPress={() => excluir(item.id_lancamento)}
+            disabled={isExcluindo}
+          >
+            {isExcluindo
+              ? <ActivityIndicator size="small" color={VERMELHO} />
+              : <Text style={s.excluirTexto}>Excluir</Text>
+            }
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -127,251 +118,216 @@ export default function LancamentosScreen({ navigation }) {
 
   return (
     <View style={s.container}>
-
-      {/* ── Header */}
-      <View style={[s.header, { backgroundColor: COR }]}>
-        <View style={s.headerCentro}>
-          <Text style={s.headerTitulo}>Lançamentos</Text>
-          <Text style={s.headerSub}>
-            {lancamentos.length === 0
-              ? 'Nenhum lançamento registrado'
-              : `${lancamentos.length} lançamento${lancamentos.length !== 1 ? 's' : ''}`}
-          </Text>
+      <View style={s.header}>
+        <Text style={s.headerTitulo}>Lançamentos</Text>
+        <View style={s.filtroRow}>
+          <TouchableOpacity style={s.dataBox} onPress={() => setMostrarCalInicio(true)}>
+            <Text style={s.dataBoxLabel}>DE</Text>
+            <Text style={s.dataBoxValor}>{fmtData(dataInicio)}</Text>
+            <Text style={s.dataBoxChevron}>›</Text>
+          </TouchableOpacity>
+          <View style={s.filtroSep}>
+            <Text style={s.filtroSepTexto}>até</Text>
+          </View>
+          <TouchableOpacity style={s.dataBox} onPress={() => setMostrarCalFim(true)}>
+            <Text style={s.dataBoxLabel}>ATÉ</Text>
+            <Text style={s.dataBoxValor}>{fmtData(dataFim)}</Text>
+            <Text style={s.dataBoxChevron}>›</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={s.headerBotao}
-          onPress={() => navigation.navigate('NovoLancamento')}
-        >
-          <Text style={s.headerBotaoTexto}>+ Novo</Text>
-        </TouchableOpacity>
       </View>
 
       <FlatList
         data={lancamentos}
         keyExtractor={item => String(item.id_lancamento)}
-        contentContainerStyle={s.lista}
-        showsVerticalScrollIndicator={false}
-
-        ListHeaderComponent={
-          lancamentos.length > 0 ? (
-            <>
-              {/* ── Stats */}
-              <View style={s.statsRow}>
-                <View style={[s.statCard, { backgroundColor: '#DCFCE7' }]}>
-                  <Text style={[s.statValor, { color: '#16A34A' }]}>{fmt(totalReceitas)}</Text>
-                  <Text style={s.statLabel}>Entradas</Text>
-                </View>
-                <View style={[s.statCard, { backgroundColor: '#FEE2E2' }]}>
-                  <Text style={[s.statValor, { color: '#DC2626' }]}>{fmt(totalSaidas)}</Text>
-                  <Text style={s.statLabel}>Saídas</Text>
-                </View>
-                <View style={[s.statCard, { backgroundColor: COR_BG }]}>
-                  <Text style={[s.statValor, { color: COR }]}>{lancamentos.length}</Text>
-                  <Text style={s.statLabel}>Total</Text>
-                </View>
-              </View>
-
-              <Text style={s.listaLabel}>TODOS OS LANÇAMENTOS</Text>
-            </>
-          ) : null
-        }
-
-        ListEmptyComponent={
-          !carregando ? (
-            <View style={s.vazio}>
-              <View style={[s.vazioIconeBox, { backgroundColor: COR_BG }]}>
-                <View style={[s.vazioDot, { backgroundColor: COR }]} />
-              </View>
-              <Text style={s.vazioTitulo}>Nenhum lançamento ainda</Text>
-              <Text style={s.vazioDesc}>
-                Registre receitas, despesas, custos e investimentos para acompanhar seu fluxo de caixa.
-              </Text>
-              <TouchableOpacity
-                style={[s.vazioBtn, { backgroundColor: COR }]}
-                onPress={() => navigation.navigate('NovoLancamento')}
-              >
-                <Text style={s.vazioBtnTexto}>+ Novo lançamento</Text>
-              </TouchableOpacity>
-            </View>
-          ) : null
-        }
-
         renderItem={renderItem}
+        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+        ListHeaderComponent={
+          carregando ? (
+            <ActivityIndicator color={AZUL} style={{ marginVertical: 20 }} size="large" />
+          ) : (
+            <>
+              {/* Card saldo */}
+              <View style={[s.saldoCard, { backgroundColor: saldoPositivo ? AZUL : VERMELHO }]}>
+                <Text style={s.saldoLabel}>Saldo do período</Text>
+                <Text style={s.saldoValor}>{fmt(totais.saldo)}</Text>
+                <View style={s.saldoDivisor} />
+                <View style={s.saldoRodape}>
+                  <View style={s.saldoMini}>
+                    <Text style={s.saldoMiniLabel}>Entradas</Text>
+                    <Text style={s.saldoMiniValor}>{fmt(totais.receita)}</Text>
+                  </View>
+                  <View style={s.saldoSep} />
+                  <View style={s.saldoMini}>
+                    <Text style={s.saldoMiniLabel}>Saídas</Text>
+                    <Text style={s.saldoMiniValor}>{fmt(totais.despesa + totais.custo)}</Text>
+                  </View>
+                  <View style={s.saldoSep} />
+                  <View style={s.saldoMini}>
+                    <Text style={s.saldoMiniLabel}>Investido</Text>
+                    <Text style={s.saldoMiniValor}>{fmt(totais.investimento)}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Mini cards por tipo */}
+              <View style={s.miniCardsRow}>
+                {[
+                  { label: 'Receitas',  valor: totais.receita,      cor: VERDE,   bg: '#ECFDF5' },
+                  { label: 'Despesas',  valor: totais.despesa,      cor: VERMELHO, bg: '#FEE2E2' },
+                  { label: 'Custos',    valor: totais.custo,        cor: ROXO,    bg: '#F5F3FF' },
+                  { label: 'Investido', valor: totais.investimento, cor: AMBAR,   bg: '#FFF8E6' },
+                ].map(item => (
+                  <View key={item.label} style={[s.miniCard, { backgroundColor: item.bg }]}>
+                    <View style={[s.miniCardDot, { backgroundColor: item.cor }]} />
+                    <Text style={[s.miniCardValor, { color: item.cor }]}>{fmt(item.valor)}</Text>
+                    <Text style={s.miniCardLabel}>{item.label}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <TouchableOpacity style={s.botaoNovo} onPress={() => navigation.navigate('NovoLancamento')}>
+                <Text style={s.botaoNovoTexto}>+ Novo lançamento</Text>
+              </TouchableOpacity>
+
+              {lancamentos.length > 0 && (
+                <Text style={s.listaLabel}>Lançamentos do período</Text>
+              )}
+            </>
+          )
+        }
+        ListEmptyComponent={
+          !carregando && (
+            <View style={s.vazio}>
+              <View style={[s.vazioIconeCircle, { backgroundColor: '#EDF7F6' }]}>
+                <View style={[s.vazioIconeDot, { backgroundColor: AZUL }]} />
+              </View>
+              <Text style={s.vazioTexto}>Nenhum lançamento neste período.</Text>
+              <Text style={s.vazioSub}>Ajuste o período ou adicione um novo lançamento.</Text>
+            </View>
+          )
+        }
       />
 
-      {carregando && (
-        <ActivityIndicator color={COR} style={s.loader} size="large" />
-      )}
-
-      {/* ── Bottom sheet */}
-      <Modal visible={menuAberto !== null} transparent animationType="none">
-        <TouchableWithoutFeedback onPress={fecharMenu}>
-          <View style={s.overlay}>
-            <TouchableWithoutFeedback>
-              <Animated.View style={[s.sheet, { transform: [{ translateY: slideAnim }] }]}>
-
-                <View style={s.sheetHandle} />
-
-                {lancamentoSelecionado && (
-                  <View style={s.sheetInfo}>
-                    <View style={[s.sheetIconeBox, { backgroundColor: CORES_BG[lancamentoSelecionado.tipo] }]}>
-                      <View style={[s.sheetDot, { backgroundColor: CORES[lancamentoSelecionado.tipo] }]} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.sheetDescricao} numberOfLines={1}>
-                        {lancamentoSelecionado.descricao || lancamentoSelecionado.categoria?.nome || LABELS[lancamentoSelecionado.tipo]}
-                      </Text>
-                      <Text style={[s.sheetValor, { color: CORES[lancamentoSelecionado.tipo] }]}>
-                        {fmt(parseFloat(lancamentoSelecionado.valor))}
-                      </Text>
-                    </View>
-                    <View style={[s.tipoBadge, { backgroundColor: CORES_BG[lancamentoSelecionado.tipo] }]}>
-                      <Text style={[s.tipoBadgeTexto, { color: CORES[lancamentoSelecionado.tipo] }]}>
-                        {LABELS[lancamentoSelecionado.tipo]}
-                      </Text>
-                    </View>
-                  </View>
-                )}
-
-                <View style={s.sheetDivisor} />
-
-                <Pressable
-                  style={({ pressed }) => [s.sheetOpcao, { backgroundColor: '#FFF5F5' }, pressed && { opacity: 0.75 }]}
-                  onPress={() => excluir(menuAberto)}
-                >
-                  <View style={[s.sheetOpcaoIconeBox, { backgroundColor: '#FEE2E2' }]}>
-                    <View style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: '#DC2626' }} />
-                  </View>
-                  <View>
-                    <Text style={[s.sheetOpcaoTexto, { color: '#DC2626' }]}>Excluir lançamento</Text>
-                    <Text style={s.sheetOpcaoSub}>Esta ação não pode ser desfeita</Text>
-                  </View>
-                </Pressable>
-
-                <Pressable
-                  style={({ pressed }) => [s.sheetCancelar, pressed && { opacity: 0.75 }]}
-                  onPress={fecharMenu}
-                >
-                  <Text style={s.sheetCancelarTexto}>Cancelar</Text>
-                </Pressable>
-
-              </Animated.View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-
+      {/* Modais calendário */}
+      {[
+        { visivel: mostrarCalInicio, fechar: () => setMostrarCalInicio(false), titulo: 'Data início', valor: dataInicio, onDia: d => { setDataInicio(d.dateString); setMostrarCalInicio(false); } },
+        { visivel: mostrarCalFim,    fechar: () => setMostrarCalFim(false),    titulo: 'Data fim',    valor: dataFim,    onDia: d => { setDataFim(d.dateString); setMostrarCalFim(false); }, minDate: dataInicio || undefined },
+      ].map(({ visivel, fechar, titulo, valor, onDia, minDate }) => (
+        <Modal key={titulo} visible={visivel} transparent animationType="fade">
+          <Pressable style={s.modalOverlay} onPress={fechar}>
+            <Pressable>
+              <View style={s.modalBox}>
+                <View style={[s.modalHeader, { backgroundColor: AZUL }]}>
+                  <Text style={s.modalTitulo}>{titulo}</Text>
+                </View>
+                <Calendar
+                  onDayPress={onDia}
+                  minDate={minDate}
+                  markedDates={valor ? { [valor]: { selected: true, selectedColor: AZUL } } : {}}
+                  theme={{ todayTextColor: AZUL, selectedDayBackgroundColor: AZUL, arrowColor: AZUL }}
+                />
+                <TouchableOpacity style={s.modalCancelar} onPress={fechar}>
+                  <Text style={s.modalCancelarTexto}>Cancelar</Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      ))}
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F1F5F9' },
-
-  // ── Header
+  container: { flex: 1, backgroundColor: FUNDO },
   header: {
+    backgroundColor: '#fff',
     paddingTop: Platform.OS === 'ios' ? 56 : (StatusBar.currentHeight ?? 24) + 12,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
+    paddingHorizontal: 20, paddingBottom: 16,
+    borderBottomWidth: 1, borderColor: '#E2E8F0',
   },
-  headerCentro: { flex: 1 },
-  headerTitulo: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
-  headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
-  headerBotao: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 16, paddingVertical: 9,
-    borderRadius: 12,
+  headerTitulo: { fontSize: 26, fontWeight: 'bold', color: PRETO, marginBottom: 14 },
+  filtroRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dataBox: {
+    flex: 1, backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: '#E2E8F0',
+    borderRadius: 12, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 4,
   },
-  headerBotaoTexto: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+  dataBoxLabel: { fontSize: 9, fontWeight: '700', color: '#94A3B8', letterSpacing: 0.5 },
+  dataBoxValor: { flex: 1, fontSize: 13, fontWeight: '700', color: PRETO },
+  dataBoxChevron: { fontSize: 18, color: '#CBD5E1' },
+  filtroSep: { alignItems: 'center' },
+  filtroSepTexto: { fontSize: 11, color: '#94A3B8', fontWeight: '600' },
 
-  // ── Lista
-  lista: { padding: 16, paddingBottom: 40 },
-  loader: { position: 'absolute', top: '50%', alignSelf: 'center' },
+  saldoCard: {
+    borderRadius: 20, padding: 20, marginBottom: 12,
+    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, elevation: 4,
+  },
+  saldoLabel: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginBottom: 4 },
+  saldoValor: { fontSize: 32, fontWeight: 'bold', color: '#fff', marginBottom: 16 },
+  saldoDivisor: { height: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginBottom: 14 },
+  saldoRodape: { flexDirection: 'row', justifyContent: 'space-between' },
+  saldoSep: { width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.2)' },
+  saldoMini: { flex: 1, alignItems: 'center' },
+  saldoMiniLabel: { fontSize: 10, color: 'rgba(255,255,255,0.65)', marginBottom: 4 },
+  saldoMiniValor: { fontSize: 13, fontWeight: '700', color: '#fff' },
 
-  // ── Stats
-  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  statCard: { flex: 1, borderRadius: 16, padding: 14, alignItems: 'center' },
-  statValor: { fontSize: 13, fontWeight: 'bold', marginBottom: 3, textAlign: 'center' },
-  statLabel: { fontSize: 11, color: '#64748B', fontWeight: '500' },
+  miniCardsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  miniCard: {
+    width: '47.5%', borderRadius: 14, padding: 14,
+    shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 4, elevation: 1,
+  },
+  miniCardDot: { width: 8, height: 8, borderRadius: 999, marginBottom: 8 },
+  miniCardValor: { fontSize: 16, fontWeight: 'bold', marginBottom: 2 },
+  miniCardLabel: { fontSize: 11, color: '#64748B' },
+
+  botaoNovo: {
+    backgroundColor: AZUL, borderRadius: 12,
+    padding: 14, alignItems: 'center', marginBottom: 16,
+  },
+  botaoNovoTexto: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
 
   listaLabel: {
     fontSize: 11, fontWeight: '700', color: '#94A3B8',
-    letterSpacing: 1, marginBottom: 10,
+    letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10,
   },
 
-  // ── Item
   item: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
-    borderRadius: 16, marginBottom: 10, overflow: 'hidden',
+    borderRadius: 14, marginBottom: 10, overflow: 'hidden',
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
   },
-  itemBarra: { width: 4, alignSelf: 'stretch' },
+  itemAccent: { width: 4, alignSelf: 'stretch' },
   itemIcone: {
     width: 42, height: 42, borderRadius: 12,
     alignItems: 'center', justifyContent: 'center',
-    marginLeft: 12, marginRight: 12, marginVertical: 14,
+    marginLeft: 12, marginVertical: 14,
   },
-  itemDot: { width: 14, height: 14, borderRadius: 999 },
-  itemInfo: { flex: 1, paddingVertical: 14 },
-  itemDesc: { fontSize: 14, fontWeight: '600', color: '#1E293B', marginBottom: 4 },
-  itemMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  catBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
-  catBadgeTexto: { fontSize: 11, fontWeight: '600' },
-  itemData: { fontSize: 11, color: '#94A3B8' },
-  itemDireita: { alignItems: 'flex-end', paddingRight: 14, gap: 6 },
+  itemIconeDot: { width: 14, height: 14, borderRadius: 999 },
+  itemInfo: { flex: 1, paddingHorizontal: 10, paddingVertical: 14 },
+  itemDesc: { fontSize: 14, color: PRETO, fontWeight: '600' },
+  itemCategoria: { fontSize: 12, color: '#64748B', marginTop: 2 },
+  itemData: { fontSize: 11, color: '#94A3B8', marginTop: 2 },
+  itemDireita: { alignItems: 'flex-end', paddingRight: 12, paddingVertical: 12, gap: 4 },
+  tipoPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  tipoTexto: { fontSize: 10, fontWeight: '700' },
   itemValor: { fontSize: 14, fontWeight: 'bold' },
+  excluirBotao: { backgroundColor: '#FEE2E2', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  excluirTexto: { fontSize: 11, color: VERMELHO, fontWeight: '600' },
 
-  // ── 3 pontinhos
-  menuBotao: { padding: 4, gap: 3, alignItems: 'center' },
-  dot: { width: 4, height: 4, borderRadius: 999, backgroundColor: '#CBD5E1' },
+  vazio: { alignItems: 'center', marginTop: 40, paddingHorizontal: 32 },
+  vazioIconeCircle: {
+    width: 64, height: 64, borderRadius: 32,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 14,
+  },
+  vazioIconeDot: { width: 20, height: 20, borderRadius: 999 },
+  vazioTexto: { fontSize: 15, color: '#64748B', fontWeight: '600', textAlign: 'center' },
+  vazioSub: { fontSize: 13, color: '#94A3B8', marginTop: 6, textAlign: 'center' },
 
-  // ── Estado vazio
-  vazio: { alignItems: 'center', paddingVertical: 56, paddingHorizontal: 32 },
-  vazioIconeBox: {
-    width: 64, height: 64, borderRadius: 20,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 16,
-  },
-  vazioDot: { width: 20, height: 20, borderRadius: 999 },
-  vazioTitulo: { fontSize: 18, fontWeight: 'bold', color: '#1E293B', marginBottom: 8 },
-  vazioDesc: { fontSize: 13, color: '#64748B', textAlign: 'center', lineHeight: 20, marginBottom: 24 },
-  vazioBtn: { paddingHorizontal: 24, paddingVertical: 14, borderRadius: 14 },
-  vazioBtnTexto: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-
-  // ── Overlay / Bottom sheet
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 20, paddingBottom: 36,
-  },
-  sheetHandle: {
-    width: 40, height: 4, borderRadius: 999,
-    backgroundColor: '#E2E8F0', alignSelf: 'center', marginBottom: 20,
-  },
-  sheetInfo: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
-  sheetIconeBox: {
-    width: 48, height: 48, borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  sheetDot: { width: 16, height: 16, borderRadius: 999 },
-  sheetDescricao: { fontSize: 15, fontWeight: '700', color: '#1E293B' },
-  sheetValor: { fontSize: 13, fontWeight: '600', marginTop: 2 },
-  tipoBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-  tipoBadgeTexto: { fontSize: 12, fontWeight: '700' },
-  sheetDivisor: { height: 1, backgroundColor: '#F1F5F9', marginBottom: 10 },
-  sheetOpcao: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    padding: 16, borderRadius: 14, marginBottom: 8,
-  },
-  sheetOpcaoIconeBox: {
-    width: 40, height: 40, borderRadius: 12,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  sheetOpcaoTexto: { fontSize: 15, fontWeight: '700' },
-  sheetOpcaoSub: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
-  sheetCancelar: {
-    padding: 16, borderRadius: 14, backgroundColor: '#F1F5F9', alignItems: 'center',
-  },
-  sheetCancelarTexto: { fontSize: 15, fontWeight: '600', color: '#64748B' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 20 },
+  modalBox: { backgroundColor: '#fff', borderRadius: 20, overflow: 'hidden' },
+  modalHeader: { padding: 16, alignItems: 'center' },
+  modalTitulo: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  modalCancelar: { padding: 16, alignItems: 'center', borderTopWidth: 1, borderColor: '#F1F5F9' },
+  modalCancelarTexto: { color: VERMELHO, fontWeight: 'bold', fontSize: 15 },
 });
