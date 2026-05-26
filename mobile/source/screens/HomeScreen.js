@@ -1,27 +1,28 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView,
-  ActivityIndicator, TouchableOpacity, Dimensions,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  TouchableOpacity,
+  Dimensions,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { PieChart } from 'react-native-chart-kit';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 
 const LARGURA = Dimensions.get('window').width;
-
-const AZUL    = '#2660A4';
-const AMBAR   = '#ECA400';
-const VERDE   = '#23967F';
-const PRETO   = '#050505';
-const FUNDO   = '#EDF7F6';
-const VERMELHO = '#DC2626';
-const ROXO    = '#7C3AED';
+const COR = '#0F766E';
+const COR_BG = '#CCFBF1';
+const COR_TEXTO = '#115E59';
 
 const CATEGORIAS = [
-  { key: 'receita',      nome: 'Receitas',      cor: VERDE,    bg: '#ECFDF5', textoCor: '#065F46' },
-  { key: 'despesa',      nome: 'Despesas',      cor: VERMELHO, bg: '#FEE2E2', textoCor: '#991B1B' },
-  { key: 'custo',        nome: 'Custos',        cor: ROXO,     bg: '#F5F3FF', textoCor: '#5B21B6' },
-  { key: 'investimento', nome: 'Investimentos', cor: AMBAR,    bg: '#FFF8E6', textoCor: '#92400E' },
+  { key: 'receita', nome: 'Receitas', cor: '#16A34A', bg: '#DCFCE7', textoCor: '#166534' },
+  { key: 'despesa', nome: 'Despesas', cor: '#DC2626', bg: '#FEE2E2', textoCor: '#991B1B' },
+  { key: 'custo', nome: 'Custos', cor: '#9333EA', bg: '#F3E8FF', textoCor: '#6B21A8' },
+  { key: 'investimento', nome: 'Investimentos', cor: '#CA8A04', bg: '#FEF3C7', textoCor: '#92400E' },
 ];
 
 export default function HomeScreen() {
@@ -29,26 +30,34 @@ export default function HomeScreen() {
   const [resumo, setResumo] = useState(null);
   const [carregando, setCarregando] = useState(true);
 
-  useEffect(() => {
-    carregar();
-  }, []);
-
-  async function carregar() {
+  const carregar = useCallback(async () => {
     try {
+      setCarregando(true);
+
       const hoje = new Date();
       const ano = hoje.getFullYear();
       const mes = String(hoje.getMonth() + 1).padStart(2, '0');
       const inicio = `${ano}-${mes}-01`;
       const ultimoDia = new Date(ano, hoje.getMonth() + 1, 0).getDate();
       const fim = `${ano}-${mes}-${ultimoDia}`;
-      const { data } = await api.get(`/relatorios/fluxo-de-caixa?data_inicio=${inicio}&data_fim=${fim}`);
+
+      const { data } = await api.get(
+        `/relatorios/fluxo-de-caixa?data_inicio=${inicio}&data_fim=${fim}`
+      );
+
       setResumo(data);
     } catch (err) {
       console.error(err);
     } finally {
       setCarregando(false);
     }
-  }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      carregar();
+    }, [carregar])
+  );
 
   const fmt = (v) => `R$ ${(v ?? 0).toFixed(2).replace('.', ',')}`;
   const saldoPositivo = (resumo?.saldo ?? 0) >= 0;
@@ -58,7 +67,7 @@ export default function HomeScreen() {
       name: cat.nome,
       population: resumo?.totais?.[cat.key] || 0,
       color: cat.cor,
-      legendFontColor: PRETO,
+      legendFontColor: '#1E293B',
       legendFontSize: 12,
     }))
     .filter((d) => d.population > 0);
@@ -72,8 +81,7 @@ export default function HomeScreen() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingBottom: 32 }}
     >
-      {/* Header */}
-      <View style={s.header}>
+      <View style={[s.header, { backgroundColor: COR }]}>
         <View style={s.headerInfo}>
           <Text style={s.ola}>Olá, {usuario?.nome?.split(' ')[0]}</Text>
           <Text style={s.sub}>Resumo financeiro do mês atual</Text>
@@ -85,14 +93,15 @@ export default function HomeScreen() {
       </View>
 
       {carregando ? (
-        <ActivityIndicator color={AZUL} style={{ marginTop: 80 }} size="large" />
+        <ActivityIndicator color={COR} style={{ marginTop: 80 }} size="large" />
       ) : (
         <>
-          {/* Card saldo */}
-          <View style={[
-            s.saldoCard,
-            { backgroundColor: saldoPositivo ? AZUL : VERMELHO }
-          ]}>
+          <View
+            style={[
+              s.saldoCard,
+              { backgroundColor: saldoPositivo ? '#115E59' : '#B42318' },
+            ]}
+          >
             <View style={s.saldoTopo}>
               <Text style={s.saldoLabel}>Saldo do mês</Text>
               <View style={s.saldoStatusPill}>
@@ -111,14 +120,18 @@ export default function HomeScreen() {
                 <Text style={s.saldoMiniLabel}>Receitas</Text>
                 <Text style={s.saldoMiniValor}>{fmt(resumo?.totais?.receita)}</Text>
               </View>
+
               <View style={s.saldoSeparador} />
+
               <View style={s.saldoMiniItem}>
                 <Text style={s.saldoMiniLabel}>Saídas totais</Text>
                 <Text style={s.saldoMiniValor}>
                   {fmt((resumo?.totais?.despesa || 0) + (resumo?.totais?.custo || 0))}
                 </Text>
               </View>
+
               <View style={s.saldoSeparador} />
+
               <View style={s.saldoMiniItem}>
                 <Text style={s.saldoMiniLabel}>Investimentos</Text>
                 <Text style={s.saldoMiniValor}>
@@ -128,7 +141,6 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* Distribuição */}
           <View style={s.secao}>
             <Text style={s.secaoTitulo}>Distribuição do mês</Text>
 
@@ -140,7 +152,7 @@ export default function HomeScreen() {
                     width={LARGURA - 32}
                     height={220}
                     chartConfig={{
-                      color: (opacity = 1) => `rgba(5, 5, 5, ${opacity})`,
+                      color: (opacity = 1) => `rgba(15, 23, 42, ${opacity})`,
                     }}
                     accessor="population"
                     backgroundColor="transparent"
@@ -154,7 +166,9 @@ export default function HomeScreen() {
                   {dadosGrafico.map((item) => {
                     const cat = CATEGORIAS.find((c) => c.nome === item.name);
                     const pct = totalMovimentado
-                      ? ((item.population / totalMovimentado) * 100).toFixed(1).replace('.', ',')
+                      ? ((item.population / totalMovimentado) * 100)
+                          .toFixed(1)
+                          .replace('.', ',')
                       : '0,0';
 
                     return (
@@ -168,8 +182,18 @@ export default function HomeScreen() {
 
                         <Text style={s.legendaValor}>{fmt(item.population)}</Text>
 
-                        <View style={[s.legendaBadge, { backgroundColor: cat?.bg ?? '#F1F5F9' }]}>
-                          <Text style={[s.legendaBadgeTexto, { color: cat?.textoCor ?? '#475569' }]}>
+                        <View
+                          style={[
+                            s.legendaBadge,
+                            { backgroundColor: cat?.bg ?? '#F1F5F9' },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              s.legendaBadgeTexto,
+                              { color: cat?.textoCor ?? '#475569' },
+                            ]}
+                          >
                             {pct}%
                           </Text>
                         </View>
@@ -197,7 +221,7 @@ export default function HomeScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: FUNDO },
+  container: { flex: 1, backgroundColor: '#F1F5F9' },
 
   header: {
     flexDirection: 'row',
@@ -205,7 +229,6 @@ const s = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
     paddingTop: 56,
-    backgroundColor: AZUL,
   },
   headerInfo: { flex: 1, paddingRight: 12 },
   ola: { fontSize: 22, fontWeight: 'bold', color: '#fff' },
@@ -244,7 +267,11 @@ const s = StyleSheet.create({
   },
   saldoStatusTexto: { fontSize: 12, color: '#fff', fontWeight: '600' },
   saldoValor: { fontSize: 36, fontWeight: 'bold', color: '#fff', marginBottom: 20 },
-  saldoDivisor: { height: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginBottom: 16 },
+  saldoDivisor: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginBottom: 16,
+  },
   saldoRodape: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -252,8 +279,17 @@ const s = StyleSheet.create({
   },
   saldoSeparador: { width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.2)' },
   saldoMiniItem: { flex: 1, alignItems: 'center' },
-  saldoMiniLabel: { fontSize: 11, color: 'rgba(255,255,255,0.65)', marginBottom: 4 },
-  saldoMiniValor: { fontSize: 13, fontWeight: '700', color: '#fff', textAlign: 'center' },
+  saldoMiniLabel: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.65)',
+    marginBottom: 4,
+  },
+  saldoMiniValor: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+    textAlign: 'center',
+  },
 
   secao: {
     backgroundColor: '#fff',
@@ -279,7 +315,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden',
     borderRadius: 16,
-    backgroundColor: FUNDO,
+    backgroundColor: '#F8FAFC',
     marginBottom: 16,
   },
 
@@ -287,7 +323,7 @@ const s = StyleSheet.create({
   legendaCell: {
     flex: 1,
     minWidth: '45%',
-    backgroundColor: FUNDO,
+    backgroundColor: '#F8FAFC',
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#E2E8F0',
@@ -296,7 +332,7 @@ const s = StyleSheet.create({
   legendaTopo: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   legendaDot: { width: 10, height: 10, borderRadius: 999, marginRight: 6 },
   legendaNome: { flex: 1, fontSize: 13, fontWeight: '600', color: '#475569' },
-  legendaValor: { fontSize: 15, fontWeight: '700', color: PRETO, marginBottom: 8 },
+  legendaValor: { fontSize: 15, fontWeight: '700', color: '#0F172A', marginBottom: 8 },
   legendaBadge: {
     alignSelf: 'flex-start',
     paddingHorizontal: 10,
@@ -319,8 +355,18 @@ const s = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 999,
-    backgroundColor: AZUL,
+    backgroundColor: '#94A3B8',
   },
-  semDadosTexto: { fontSize: 16, color: '#475569', fontWeight: '700', marginBottom: 6 },
-  semDadosSub: { fontSize: 13, color: '#94A3B8', textAlign: 'center', lineHeight: 19 },
+  semDadosTexto: {
+    fontSize: 16,
+    color: '#475569',
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  semDadosSub: {
+    fontSize: 13,
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 19,
+  },
 });
