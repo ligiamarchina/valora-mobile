@@ -1,15 +1,15 @@
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../context/AuthContext';
+import { NavigationContainer } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { Ionicons } from "@expo/vector-icons";
+import { useAuth } from "../context/AuthContext";
 
-import LoginScreen from '../screens/LoginScreen';
-import CadastroScreen from '../screens/CadastroScreen';
-import HomeScreen from '../screens/HomeScreen';
-import LancamentosScreen from '../screens/LancamentosScreen';
-import NovoLancamentoScreen from '../screens/NovoLancamentoScreen';
-import AlertasScreen from '../screens/AlertasScreen';
+import LoginScreen from "../screens/LoginScreen";
+import CadastroScreen from "../screens/CadastroScreen";
+import HomeScreen from "../screens/HomeScreen";
+import LancamentosScreen from "../screens/LancamentosScreen";
+import NovoLancamentoScreen from "../screens/NovoLancamentoScreen";
+import PrecosMediosScreen from "../screens/PrecosMediosScreen"; // ← substitui AlertasScreen
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -19,11 +19,11 @@ function TabsAutenticadas() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#2660A4',
-        tabBarInactiveTintColor: '#94A3B8',
+        tabBarActiveTintColor: "#2660A4",
+        tabBarInactiveTintColor: "#94A3B8",
         tabBarStyle: {
-          backgroundColor: '#fff',
-          borderTopColor: '#E2E8F0',
+          backgroundColor: "#fff",
+          borderTopColor: "#E2E8F0",
           borderTopWidth: 1,
           height: 60,
           paddingBottom: 8,
@@ -31,7 +31,7 @@ function TabsAutenticadas() {
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '600',
+          fontWeight: "600",
         },
       }}
     >
@@ -39,10 +39,10 @@ function TabsAutenticadas() {
         name="Home"
         component={HomeScreen}
         options={{
-          tabBarLabel: 'Início',
+          tabBarLabel: "Início",
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons
-              name={focused ? 'home' : 'home-outline'}
+              name={focused ? "home" : "home-outline"}
               size={size}
               color={color}
             />
@@ -53,24 +53,25 @@ function TabsAutenticadas() {
         name="Lancamentos"
         component={LancamentosScreen}
         options={{
-          tabBarLabel: 'Lançamentos',
+          tabBarLabel: "Lançamentos",
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons
-              name={focused ? 'swap-vertical' : 'swap-vertical-outline'}
+              name={focused ? "swap-vertical" : "swap-vertical-outline"}
               size={size}
               color={color}
             />
           ),
         }}
       />
+      {/* Aba Alertas substituída por Preços Médios */}
       <Tab.Screen
-        name="Alertas"
-        component={AlertasScreen}
+        name="PrecosMedios"
+        component={PrecosMediosScreen}
         options={{
-          tabBarLabel: 'Alertas',
+          tabBarLabel: "Preços",
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons
-              name={focused ? 'notifications' : 'notifications-outline'}
+              name={focused ? "trending-up" : "trending-up-outline"}
               size={size}
               color={color}
             />
@@ -90,7 +91,10 @@ export default function Navigation() {
         {usuario ? (
           <>
             <Stack.Screen name="Tabs" component={TabsAutenticadas} />
-            <Stack.Screen name="NovoLancamento" component={NovoLancamentoScreen} />
+            <Stack.Screen
+              name="NovoLancamento"
+              component={NovoLancamentoScreen}
+            />
           </>
         ) : (
           <>
