@@ -37,7 +37,7 @@ export default function PrecosMediosScreen({ navigation }) {
   const [carregando, setCarregando] = useState(true);
   const [produtos, setProdutos] = useState([]);
   const [categoriaAtiva, setCategoriaAtiva] = useState("Todos");
-  const [nomeSelecionado, setNomeSelecionado] = useState(null); // ← guarda só o nome
+  const [nomeSelecionado, setNomeSelecionado] = useState(null);
   const [categoriasDisponiveis, setCategoriasDisponiveis] = useState(["Todos"]);
 
   useFocusEffect(
@@ -282,7 +282,15 @@ export default function PrecosMediosScreen({ navigation }) {
                 <Text style={s.historicoTitulo}>Histórico de registros</Text>
                 {produtoSelecionado.historico.map((h) => (
                   <View key={h.id_preco} style={s.historicoLinha}>
-                    <Text style={s.historicoMes}>{h.mes}</Text>
+                    <Text style={s.historicoMes}>
+                      {new Date(h.data_referencia + "T12:00:00")
+                        .toLocaleDateString("pt-BR", {
+                          month: "short",
+                          year: "numeric",
+                        })
+                        .replace(". de ", "/")
+                        .replace(".", "")}
+                    </Text>
                     <Text style={s.historicoValor}>{fmt(h.preco)}</Text>
                     <TouchableOpacity
                       onPress={() =>
