@@ -55,7 +55,6 @@ export default function PrecosMediosScreen({ navigation }) {
       const cats = ["Todos", ...new Set(data.map((p) => p.categoria))];
       setCategoriasDisponiveis(cats);
 
-      // Seleciona o primeiro só se ainda não tiver nenhum selecionado
       if (data.length > 0) {
         setNomeSelecionado((prev) => prev ?? data[0].nome);
       }
@@ -66,7 +65,6 @@ export default function PrecosMediosScreen({ navigation }) {
     }
   }
 
-  // Deriva o objeto do produto selecionado sempre a partir da lista atual
   const produtoSelecionado =
     produtos.find((p) => p.nome === nomeSelecionado) ?? null;
 
@@ -313,7 +311,7 @@ export default function PrecosMediosScreen({ navigation }) {
 
             return (
               <TouchableOpacity
-                key={produto.id}
+                key={produto.nome}
                 style={[s.item, selecionado && s.itemSelecionado]}
                 onPress={() => setNomeSelecionado(produto.nome)}
                 activeOpacity={0.75}
@@ -496,14 +494,15 @@ const s = StyleSheet.create({
     borderRadius: 14,
     marginHorizontal: 16,
     marginBottom: 8,
-    overflow: "hidden",
+    borderWidth: 1.5,
+    borderColor: "transparent",
     shadowColor: "#000",
     shadowOpacity: 0.04,
     shadowRadius: 6,
     elevation: 2,
   },
-  itemSelecionado: { borderWidth: 1.5, borderColor: AZUL },
-  itemAccent: { width: 4, alignSelf: "stretch" },
+  itemSelecionado: { borderColor: AZUL },
+  itemAccent: { width: 4, alignSelf: "stretch", borderRadius: 2 },
   itemInfo: { flex: 1, paddingHorizontal: 12, paddingVertical: 14 },
   itemNome: { fontSize: 14, fontWeight: "600", color: PRETO },
   itemCategoria: { fontSize: 12, color: "#94A3B8", marginTop: 2 },
