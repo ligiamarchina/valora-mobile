@@ -19,6 +19,7 @@ export default function AlertasScreen() {
   const [alertas, setAlertas] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
+  const [tipoAlerta, setTipoAlerta] = useState('limite_despesa');
   const [descricao, setDescricao] = useState('');
   const [valor, setValor] = useState('');
   const [formAberto, setFormAberto] = useState(false);
@@ -74,16 +75,33 @@ export default function AlertasScreen() {
       .start(() => setMenuAberto(null));
   }
 
+  // FIX: descrição padrão agora depende do tipo de alerta escolhido
+  function descricaoPadrao(tipo) {
+    return tipo === 'limite_faturamento'
+      ? 'Alerta de teto de faturamento MEI'
+      : 'Alerta de limite de despesas';
+  }
+
+  function selecionarTipo(tipo) {
+    setTipoAlerta(tipo);
+    // FIX: sugere automaticamente o teto anual do MEI dividido não é necessário aqui —
+    // o valor de referência continua sendo o teto ANUAL (ex: 81000), a divisão mensal
+    // é feita no backend na hora de verificar.
+    if (tipo === 'limite_faturamento' && !valor) {
+      setValor('81000,00');
+    }
+  }
+
   async function criarAlerta() {
     if (!valor) return Alert.alert('Atenção', 'Informe um valor limite.');
     setSalvando(true);
     try {
       await api.post('/alertas', {
-        tipo_alerta: 'limite_despesa',
-        descricao: descricao.trim() || 'Alerta de limite de despesas',
+        tipo_alerta: tipoAlerta,
+        descricao: descricao.trim() || descricaoPadrao(tipoAlerta),
         valor_referencia: parseFloat(valor.replace(',', '.')),
       });
-      setDescricao(''); setValor('');
+      setDescricao(''); setValor(''); setTipoAlerta('limite_despesa');
       toggleForm(); carregar();
     } catch {
       Alert.alert('Erro', 'Não foi possível criar o alerta.');
@@ -141,6 +159,11 @@ export default function AlertasScreen() {
   const inativos = alertas.filter(a => !a.ativo);
   const alertaSelecionado = alertas.find(a => a.id_alerta === menuAberto);
 
+  // FIX: rótulo amigável do tipo de alerta pra mostrar no card da lista
+  function labelTipo(tipo) {
+    return tipo === 'limite_faturamento' ? 'Faturamento (MEI)' : 'Despesas';
+  }
+
   function renderAlerta({ item }) {
     return (
       <View style={[s.item, !item.ativo && s.itemInativo]}>
@@ -156,6 +179,7 @@ export default function AlertasScreen() {
           <Text style={[s.itemDesc, !item.ativo && { color: '#94A3B8' }]} numberOfLines={1}>
             {item.descricao}
           </Text>
+          <Text style={s.itemTipo}>{labelTipo(item.tipo_alerta)}</Text>
           <Text style={[s.itemLimite, { color: item.ativo ? AMBAR : '#94A3B8' }]}>
             Limite: {fmt(item.valor_referencia)}
           </Text>
@@ -243,19 +267,44 @@ export default function AlertasScreen() {
 
               {formAberto && (
                 <Animated.View style={[s.form, { opacity: formAnim }]}>
-                  <Text style={s.formTitulo}>Novo alerta de limite</Text>
+                  <Text style={s.formTitulo}>Novo alerta</Text>
                   <Text style={s.formDesc}>
-                    Você será notificado quando suas despesas do mês ultrapassarem o valor definido.
+                    {tipoAlerta === 'limite_faturamento'
+                      ? 'Você será notificado mensalmente se o ritmo do seu faturamento no ano estiver acima do esperado para não estourar o teto do MEI.'
+                      : 'Você será notificado quando suas despesas do mês ultrapassarem o valor definido.'}
                   </Text>
+
+                  <Text style={s.fieldLabel}>Tipo de alerta</Text>
+                  <View style={s.tipoRow}>
+                    <TouchableOpacity
+                      style={[s.tipoBotao, tipoAlerta === 'limite_despesa' && s.tipoBotaoAtivo]}
+                      onPress={() => selecionarTipo('limite_despesa')}
+                    >
+                      <Text style={tipoAlerta === 'limite_despesa' ? s.tipoTextoAtivo : s.tipoTexto}>
+                        Limite de despesas
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[s.tipoBotao, tipoAlerta === 'limite_faturamento' && s.tipoBotaoAtivo]}
+                      onPress={() => selecionarTipo('limite_faturamento')}
+                    >
+                      <Text style={tipoAlerta === 'limite_faturamento' ? s.tipoTextoAtivo : s.tipoTexto}>
+                        Faturamento (MEI)
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
                   <Text style={s.fieldLabel}>Descrição <Text style={s.opcional}>(opcional)</Text></Text>
                   <TextInput
                     style={s.input}
-                    placeholder="Ex: Limite mensal de gastos"
+                    placeholder={tipoAlerta === 'limite_faturamento' ? 'Ex: Teto anual MEI' : 'Ex: Limite mensal de gastos'}
                     placeholderTextColor="#CBD5E1"
                     value={descricao}
                     onChangeText={setDescricao}
                   />
-                  <Text style={s.fieldLabel}>Limite de despesas</Text>
+                  <Text style={s.fieldLabel}>
+                    {tipoAlerta === 'limite_faturamento' ? 'Teto anual de faturamento' : 'Limite de despesas'}
+                  </Text>
                   <View style={s.valorBox}>
                     <Text style={s.valorCifrao}>R$</Text>
                     <TextInput
@@ -292,7 +341,7 @@ export default function AlertasScreen() {
                 </View>
                 <Text style={s.vazioTitulo}>Nenhum alerta configurado</Text>
                 <Text style={s.vazioDesc}>
-                  Crie um alerta para ser notificado quando suas despesas ultrapassarem um limite definido por você.
+                  Crie um alerta para ser notificado quando suas despesas ou seu faturamento ultrapassarem um limite definido por você.
                 </Text>
                 <TouchableOpacity style={s.botaoCriarVazio} onPress={toggleForm}>
                   <Text style={s.botaoCriarVazioTexto}>Criar primeiro alerta</Text>
@@ -439,6 +488,14 @@ const s = StyleSheet.create({
   formDesc: { fontSize: 13, color: '#64748B', marginBottom: 20, lineHeight: 19 },
   fieldLabel: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 8 },
   opcional: { fontSize: 12, color: '#94A3B8', fontWeight: '400' },
+  tipoRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  tipoBotao: {
+    flex: 1, paddingVertical: 12, borderRadius: 10,
+    borderWidth: 1.5, borderColor: '#E2E8F0', alignItems: 'center',
+  },
+  tipoBotaoAtivo: { borderColor: AZUL, backgroundColor: AZUL_BG },
+  tipoTexto: { fontSize: 13, fontWeight: '600', color: '#94A3B8' },
+  tipoTextoAtivo: { fontSize: 13, fontWeight: '700', color: AZUL },
   input: {
     backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: '#E2E8F0',
     borderRadius: 12, padding: 14, fontSize: 15, color: PRETO, marginBottom: 16,
@@ -474,6 +531,7 @@ const s = StyleSheet.create({
   bellDot: { width: 4, height: 4, borderRadius: 999, marginBottom: -3 },
   itemConteudo: { flex: 1, paddingHorizontal: 12, paddingVertical: 14 },
   itemDesc: { fontSize: 14, fontWeight: '600', color: PRETO, marginBottom: 3 },
+  itemTipo: { fontSize: 11, color: '#94A3B8', fontWeight: '600', marginBottom: 3 },
   itemLimite: { fontSize: 13, fontWeight: '700' },
   itemDireita: { paddingRight: 8, alignItems: 'flex-end', gap: 8 },
   statusPill: {

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../services/api';
+import { usePushRegistration } from '../hooks/usePushRegistration'; // FIX: novo import
 
 const AuthContext = createContext({});
 
@@ -20,6 +21,9 @@ export function AuthProvider({ children }) {
     }
     carregar();
   }, []);
+
+  // FIX: registra o token de push assim que houver um usuário logado
+  usePushRegistration(usuario);
 
   async function login(email, senha) {
     const { data } = await api.post('/auth/login', { email, senha });
