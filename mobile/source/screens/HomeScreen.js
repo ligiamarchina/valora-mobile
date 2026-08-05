@@ -25,7 +25,7 @@ const CATEGORIAS = [
   { key: 'investimento', nome: 'Investimentos', cor: '#CA8A04', bg: '#FEF3C7', textoCor: '#92400E' },
 ];
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }) { // FIX: recebe navigation
   const { usuario, logout } = useAuth();
   const [resumo, setResumo] = useState(null);
   const [carregando, setCarregando] = useState(true);
@@ -87,9 +87,20 @@ export default function HomeScreen() {
           <Text style={s.sub}>Resumo financeiro do mês atual</Text>
         </View>
 
-        <TouchableOpacity onPress={logout} style={s.sairBotao}>
-          <Text style={s.sair}>Sair</Text>
-        </TouchableOpacity>
+        {/* FIX: grupo de botões do header — alertas + sair */}
+        <View style={s.headerBotoes}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Alertas')}
+            style={s.alertasBotao}
+          >
+            <View style={s.alertasIcone} />
+            <Text style={s.alertasTexto}>Alertas</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={logout} style={s.sairBotao}>
+            <Text style={s.sair}>Sair</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {carregando ? (
@@ -233,6 +244,26 @@ const s = StyleSheet.create({
   headerInfo: { flex: 1, paddingRight: 12 },
   ola: { fontSize: 22, fontWeight: 'bold', color: '#fff' },
   sub: { fontSize: 13, color: 'rgba(255,255,255,0.82)', marginTop: 4 },
+
+  // FIX: novos estilos do botão de alertas
+  headerBotoes: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  alertasBotao: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  alertasIcone: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: '#FCD34D',
+  },
+  alertasTexto: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
+
   sairBotao: {
     backgroundColor: 'rgba(255,255,255,0.18)',
     paddingHorizontal: 14,
