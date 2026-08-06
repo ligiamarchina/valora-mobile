@@ -15,7 +15,7 @@ const AMBAR_BG = '#FFF8E6';
 const VERDE    = '#23967F';
 const PRETO    = '#050505';
 
-export default function AlertasScreen() {
+export default function AlertasScreen({ navigation }) { // FIX: recebe navigation
   const [alertas, setAlertas] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
@@ -84,9 +84,8 @@ export default function AlertasScreen() {
 
   function selecionarTipo(tipo) {
     setTipoAlerta(tipo);
-    // FIX: sugere automaticamente o teto anual do MEI dividido não é necessário aqui —
-    // o valor de referência continua sendo o teto ANUAL (ex: 81000), a divisão mensal
-    // é feita no backend na hora de verificar.
+    // FIX: o valor de referência continua sendo o teto ANUAL (ex: 81000),
+    // a divisão mensal é feita no backend na hora de verificar.
     if (tipo === 'limite_faturamento' && !valor) {
       setValor('81000,00');
     }
@@ -208,7 +207,17 @@ export default function AlertasScreen() {
       <View style={s.container}>
 
         <View style={s.header}>
-          <Text style={s.headerTitulo}>Alertas</Text>
+          {/* FIX: linha do topo com botão de voltar + título */}
+          <View style={s.headerTopo}>
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              style={s.voltarBotao}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={s.voltarSeta}>‹</Text>
+            </TouchableOpacity>
+            <Text style={s.headerTitulo}>Alertas</Text>
+          </View>
           <Text style={s.headerSub}>
             {alertas.length === 0
               ? 'Nenhum alerta configurado'
@@ -453,6 +462,15 @@ const s = StyleSheet.create({
     paddingBottom: 20, paddingHorizontal: 24,
     borderBottomWidth: 1, borderColor: '#E2E8F0',
   },
+  // FIX: novos estilos do botão de voltar
+  headerTopo: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  voltarBotao: {
+    width: 32, height: 32, borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center', justifyContent: 'center',
+    marginRight: 10,
+  },
+  voltarSeta: { fontSize: 22, color: PRETO, fontWeight: '600', marginTop: -2 },
   headerTitulo: { fontSize: 26, fontWeight: 'bold', color: PRETO },
   headerSub: { fontSize: 13, color: '#94A3B8', marginTop: 4 },
   lista: { padding: 16, paddingBottom: 100 },

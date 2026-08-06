@@ -12,6 +12,7 @@ import NovoLancamentoScreen from "../screens/NovoLancamentoScreen";
 import PrecosMediosScreen from "../screens/PrecosMediosScreen";
 import NotasScreen from "../screens/NotasScreen";
 import NovaNotaFiscalScreen from "../screens/NovaNotaFiscalScreen";
+import AlertasScreen from "../screens/AlertasScreen"; // FIX: novo import
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -111,6 +112,8 @@ export default function Navigation() {
               name="NovaNotaFiscal"
               component={NovaNotaFiscalScreen}
             />
+            {/* FIX: Alertas acessível via botão na Home, fora das tabs */}
+            <Stack.Screen name="Alertas" component={AlertasScreen} />
           </>
         ) : (
           <>
