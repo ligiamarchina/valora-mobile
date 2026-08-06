@@ -8,8 +8,7 @@ const relatoriosRoutes = require("./routes/relatorios");
 const alertasRoutes = require("./routes/alertas");
 const categoriasRoutes = require("./routes/categorias");
 const precosRoutes = require("./routes/precos");
-
-
+const notasRoutes = require("./routes/notas");
 
 const app = express();
 
@@ -22,9 +21,9 @@ app.use("/relatorios", relatoriosRoutes);
 app.use("/alertas", alertasRoutes);
 app.use("/categorias", categoriasRoutes);
 app.use("/precos-medios", precosRoutes);
-app.use('/dispositivos', require('./routes/dispositivos'));
-app.use('/cron', require('./routes/cron'));
-
+app.use("/dispositivos", require("./routes/dispositivos"));
+app.use("/cron", require("./routes/cron"));
+app.use("/notas", notasRoutes);
 
 app.get("/", (req, res) => {
   res.json({ status: "ok", mensagem: "API MEI rodando 🚀" });
