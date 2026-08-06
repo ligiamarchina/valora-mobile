@@ -9,7 +9,9 @@ import CadastroScreen from "../screens/CadastroScreen";
 import HomeScreen from "../screens/HomeScreen";
 import LancamentosScreen from "../screens/LancamentosScreen";
 import NovoLancamentoScreen from "../screens/NovoLancamentoScreen";
-import PrecosMediosScreen from "../screens/PrecosMediosScreen"; // ← substitui AlertasScreen
+import PrecosMediosScreen from "../screens/PrecosMediosScreen";
+import NotasScreen from "../screens/NotasScreen";
+import NovaNotaFiscalScreen from "../screens/NovaNotaFiscalScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -29,10 +31,7 @@ function TabsAutenticadas() {
           paddingBottom: 8,
           paddingTop: 6,
         },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: "600",
-        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
       }}
     >
       <Tab.Screen
@@ -63,7 +62,6 @@ function TabsAutenticadas() {
           ),
         }}
       />
-      {/* Aba Alertas substituída por Preços Médios */}
       <Tab.Screen
         name="PrecosMedios"
         component={PrecosMediosScreen}
@@ -72,6 +70,20 @@ function TabsAutenticadas() {
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons
               name={focused ? "trending-up" : "trending-up-outline"}
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Notas"
+        component={NotasScreen}
+        options={{
+          tabBarLabel: "Notas",
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? "document-text" : "document-text-outline"}
               size={size}
               color={color}
             />
@@ -94,6 +106,10 @@ export default function Navigation() {
             <Stack.Screen
               name="NovoLancamento"
               component={NovoLancamentoScreen}
+            />
+            <Stack.Screen
+              name="NovaNotaFiscal"
+              component={NovaNotaFiscalScreen}
             />
           </>
         ) : (
