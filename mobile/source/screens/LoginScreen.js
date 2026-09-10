@@ -1,29 +1,37 @@
-import { useState } from 'react';
+import { useState } from "react";
 import {
-  View, Text, TextInput, TouchableOpacity,
-  StyleSheet, Alert, ActivityIndicator,
-  KeyboardAvoidingView, Platform
-} from 'react-native';
-import { useAuth } from '../context/AuthContext';
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform,
+} from "react-native";
+import { useAuth } from "../context/AuthContext";
 
-const AZUL = '#2660A4';
-const AMBAR = '#ECA400';
-const PRETO = '#050505';
-const FUNDO = '#EDF7F6';
+const AZUL = "#2660A4";
+const AMBAR = "#ECA400";
+const PRETO = "#050505";
+const FUNDO = "#EDF7F6";
 
 export default function LoginScreen({ navigation }) {
   const { login } = useAuth();
-  const [email, setEmail] = useState('');
-  const [senha, setSenha] = useState('');
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
   const [carregando, setCarregando] = useState(false);
 
   async function handleLogin() {
-    if (!email || !senha) return Alert.alert('Atenção', 'Preencha e-mail e senha.');
+    if (!email || !senha)
+      return Alert.alert("Atenção", "Preencha e-mail e senha.");
     setCarregando(true);
     try {
       await login(email, senha);
-    } catch (err) {
-      Alert.alert('Erro', 'E-mail ou senha incorretos.');
+    } catch {
+      Alert.alert("Erro", "E-mail ou senha incorretos.");
     } finally {
       setCarregando(false);
     }
@@ -31,81 +39,97 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <KeyboardAvoidingView
-      style={s.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={{ flex: 1, backgroundColor: FUNDO }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "android" ? -64 : 0}
     >
-      <View style={s.topo}>
-        <View style={s.logoWrap}>
-          <View style={s.logoCircle} />
-        </View>
-        <Text style={s.titulo}>Valora</Text>
-        <Text style={s.subtitulo}>O valor do seu negócio, organizado.</Text>
-      </View>
-
-      <View style={s.card}>
-        <Text style={s.cardTitulo}>Entrar</Text>
-        <Text style={s.cardSubtitulo}>Acesse sua conta para acompanhar o fluxo do seu negócio.</Text>
-
-        <View style={s.campo}>
-          <Text style={s.label}>E-mail</Text>
-          <TextInput
-            style={s.input}
-            placeholder="seuemail@exemplo.com"
-            placeholderTextColor="#94A3B8"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
+      <ScrollView
+        contentContainerStyle={s.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={s.topo}>
+          <View style={s.logoWrap}>
+            <View style={s.logoCircle} />
+          </View>
+          <Text style={s.titulo}>Valora</Text>
+          <Text style={s.subtitulo}>O valor do seu negócio, organizado.</Text>
         </View>
 
-        <View style={s.campo}>
-          <Text style={s.label}>Senha</Text>
-          <TextInput
-            style={s.input}
-            placeholder="Digite sua senha"
-            placeholderTextColor="#94A3B8"
-            value={senha}
-            onChangeText={setSenha}
-            secureTextEntry
-          />
+        <View style={s.card}>
+          <Text style={s.cardTitulo}>Entrar</Text>
+          <Text style={s.cardSubtitulo}>
+            Acesse sua conta para acompanhar o fluxo do seu negócio.
+          </Text>
+
+          <View style={s.campo}>
+            <Text style={s.label}>E-mail</Text>
+            <TextInput
+              style={s.input}
+              placeholder="seuemail@exemplo.com"
+              placeholderTextColor="#94A3B8"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              returnKeyType="next"
+            />
+          </View>
+
+          <View style={s.campo}>
+            <Text style={s.label}>Senha</Text>
+            <TextInput
+              style={s.input}
+              placeholder="Digite sua senha"
+              placeholderTextColor="#94A3B8"
+              value={senha}
+              onChangeText={setSenha}
+              secureTextEntry
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
+            />
+          </View>
+
+          <TouchableOpacity
+            style={s.botao}
+            onPress={handleLogin}
+            disabled={carregando}
+          >
+            {carregando ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={s.botaoTexto}>Entrar</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => navigation.navigate("Cadastro")}>
+            <Text style={s.link}>Não tem conta? Cadastre-se</Text>
+          </TouchableOpacity>
         </View>
-
-        <TouchableOpacity style={s.botao} onPress={handleLogin} disabled={carregando}>
-          {carregando ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={s.botaoTexto}>Entrar</Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => navigation.navigate('Cadastro')}>
-          <Text style={s.link}>Não tem conta? Cadastre-se</Text>
-        </TouchableOpacity>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const s = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: FUNDO,
-    justifyContent: 'center',
+    flexGrow: 1,
+    justifyContent: "center",
     padding: 24,
+    paddingBottom: 48,
   },
 
   topo: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 28,
   },
   logoWrap: {
     width: 70,
     height: 70,
     borderRadius: 22,
-    backgroundColor: '#DCEBFA',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#DCEBFA",
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 16,
   },
   logoCircle: {
@@ -114,55 +138,44 @@ const s = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: AMBAR,
   },
-  titulo: {
-    fontSize: 34,
-    fontWeight: 'bold',
-    color: AZUL,
-    marginBottom: 6,
-  },
-  subtitulo: {
-    fontSize: 14,
-    color: '#64748B',
-    textAlign: 'center',
-  },
+  titulo: { fontSize: 34, fontWeight: "bold", color: AZUL, marginBottom: 6 },
+  subtitulo: { fontSize: 14, color: "#64748B", textAlign: "center" },
 
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 22,
     padding: 22,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 4,
   },
   cardTitulo: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: PRETO,
     marginBottom: 6,
   },
   cardSubtitulo: {
     fontSize: 13,
-    color: '#64748B',
+    color: "#64748B",
     lineHeight: 19,
     marginBottom: 20,
   },
 
-  campo: {
-    marginBottom: 14,
-  },
+  campo: { marginBottom: 14 },
   label: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-    textTransform: 'uppercase',
+    fontWeight: "700",
+    color: "#64748B",
+    textTransform: "uppercase",
     letterSpacing: 0.8,
     marginBottom: 6,
   },
   input: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: "#F8FAFC",
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: "#E2E8F0",
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 14,
@@ -174,20 +187,16 @@ const s = StyleSheet.create({
     backgroundColor: AZUL,
     borderRadius: 12,
     padding: 16,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 8,
   },
-  botaoTexto: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
+  botaoTexto: { color: "#fff", fontWeight: "bold", fontSize: 16 },
 
   link: {
     color: AZUL,
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: 18,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });
