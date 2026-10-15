@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   StatusBar,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
+import { useFocusEffect } from "@react-navigation/native";
 import api from "../services/api";
 
 // Tipos financeiros normais
@@ -21,6 +22,7 @@ const TIPOS = [
   { key: "despesa", label: "Despesa", cor: "#DC2626", bg: "#FEE2E2" },
   { key: "custo", label: "Custo", cor: "#9333EA", bg: "#F3E8FF" },
   { key: "investimento", label: "Investimento", cor: "#CA8A04", bg: "#FEF3C7" },
+  { key: "saldo_inicial", label: "Saldo inicial", cor: "#2660A4", bg: "#DBEAFE" },
   {
     key: "preco_mercado",
     label: "Preço Mercado",
@@ -63,6 +65,38 @@ const CATEGORIAS_PRECO = [
   "Outros",
 ];
 
+const CLASSIFICACOES_DRE = {
+  receita_bruta: "Receita bruta",
+  deducao_receita: "Dedução da receita",
+  custo: "Custo das vendas/serviços",
+  despesa_operacional: "Despesa operacional",
+  receita_financeira: "Receita financeira",
+  despesa_financeira: "Despesa financeira",
+  imposto_lucro: "Imposto sobre o lucro",
+  investimento: "Fora do DRE (investimento)",
+};
+
+const CLASSIFICACOES_POR_TIPO = {
+  receita: ["receita_bruta", "receita_financeira"],
+  despesa: [
+    "deducao_receita",
+    "despesa_operacional",
+    "despesa_financeira",
+    "imposto_lucro",
+  ],
+  custo: ["custo"],
+  investimento: ["investimento"],
+};
+
+function classificacaoPadrao(tipo) {
+  return {
+    receita: "receita_bruta",
+    despesa: "despesa_operacional",
+    custo: "custo",
+    investimento: "investimento",
+  }[tipo];
+}
+
 function formatarValor(texto) {
   const numeros = texto.replace(/\D/g, "");
   if (!numeros) return "";
@@ -92,7 +126,12 @@ export default function NovoLancamentoScreen({ navigation, route }) {
   const [data, setData] = useState("");
   const [descricao, setDescricao] = useState("");
   const [categorias, setCategorias] = useState([]);
+  const [contas, setContas] = useState([]);
   const [idCategoria, setIdCategoria] = useState(null);
+  const [idConta, setIdConta] = useState(route?.params?.idContaInicial ?? null);
+  const [classificacaoDre, setClassificacaoDre] = useState(
+    classificacaoPadrao(tipoInicial),
+  );
   const [carregando, setCarregando] = useState(false);
   const [mostrarCalendario, setMostrarCalendario] = useState(false);
 
@@ -102,10 +141,11 @@ export default function NovoLancamentoScreen({ navigation, route }) {
   const [categoriaPreco, setCategoriaPreco] = useState("");
 
   const isPreco = tipo === "preco_mercado";
+  const isSaldoInicial = tipo === "saldo_inicial";
   const tipoAtual = TIPOS.find((t) => t.key === tipo);
 
   useEffect(() => {
-    if (!isPreco) {
+    if (!isPreco && !isSaldoInicial) {
       api
         .get("/categorias")
         .then(({ data }) => setCategorias(data))
@@ -113,7 +153,24 @@ export default function NovoLancamentoScreen({ navigation, route }) {
           Alert.alert("Aviso", "Não foi possível carregar as categorias."),
         );
     }
-  }, [isPreco]);
+  }, [isPreco, isSaldoInicial]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (isPreco) return;
+      api
+        .get("/contas")
+        .then(({ data }) => {
+          setContas(data);
+          setIdConta((atual) =>
+            data.some((conta) => conta.id_conta === atual)
+              ? atual
+              : data[0]?.id_conta ?? null,
+          );
+        })
+        .catch(() => Alert.alert("Aviso", "Não foi possível carregar as contas."));
+    }, [isPreco]),
+  );
 
   const categoriasFiltradas = useMemo(
     () => categorias.filter((c) => c.tipo === tipo),
@@ -127,6 +184,7 @@ export default function NovoLancamentoScreen({ navigation, route }) {
   function trocarTipo(novoTipo) {
     setTipo(novoTipo);
     setIdCategoria(null);
+    setClassificacaoDre(classificacaoPadrao(novoTipo));
   }
 
   async function salvar() {
@@ -135,7 +193,18 @@ export default function NovoLancamentoScreen({ navigation, route }) {
 
     setCarregando(true);
     try {
-      if (isPreco) {
+      if (isSaldoInicial) {
+        const contaSelecionada = contas.find((conta) => conta.id_conta === idConta);
+        if (!contaSelecionada) {
+          return Alert.alert("Atenção", "Selecione ou cadastre uma conta.");
+        }
+
+        await api.put(`/contas/${idConta}`, {
+          nome: contaSelecionada.nome,
+          saldo_inicial: valorParaNumero(valor),
+          data_saldo_inicial: data,
+        });
+      } else if (isPreco) {
         // Salva na tabela preco_mercado
         if (!nomeProduto.trim())
           return Alert.alert("Atenção", "Informe o nome do produto.");
@@ -153,11 +222,16 @@ export default function NovoLancamentoScreen({ navigation, route }) {
         });
       } else {
         // Salva na tabela lancamento_financeiro
+        const contaSelecionada = contas.find((conta) => conta.id_conta === idConta);
+        if (!contaSelecionada)
+          return Alert.alert("Atenção", "Selecione ou cadastre uma conta.");
         if (!idCategoria)
           return Alert.alert("Atenção", "Selecione uma categoria.");
 
         await api.post("/lancamentos", {
           tipo,
+          classificacao_dre: classificacaoDre,
+          id_conta: idConta,
           valor: valorParaNumero(valor),
           data_lancamento: data,
           descricao: descricao.trim(),
@@ -184,12 +258,18 @@ export default function NovoLancamentoScreen({ navigation, route }) {
         </TouchableOpacity>
         <View style={s.headerCentro}>
           <Text style={s.headerTitulo}>
-            {isPreco ? "Registrar Preço" : "Novo lançamento"}
+            {isPreco
+              ? "Registrar Preço"
+              : isSaldoInicial
+                ? "Informar saldo inicial"
+                : "Novo lançamento"}
           </Text>
           <Text style={s.headerSub}>
             {isPreco
               ? "Atualize o preço de um produto"
-              : "Preencha os dados do lançamento"}
+              : isSaldoInicial
+                ? "Informe o valor que já havia na conta"
+                : "Preencha os dados do lançamento"}
           </Text>
         </View>
       </View>
@@ -325,7 +405,9 @@ export default function NovoLancamentoScreen({ navigation, route }) {
 
         {/* Valor */}
         <View style={s.bloco}>
-          <Text style={s.blocoTitulo}>{isPreco ? "Preço atual" : "Valor"}</Text>
+          <Text style={s.blocoTitulo}>
+            {isPreco ? "Preço atual" : isSaldoInicial ? "Saldo na data-base" : "Valor"}
+          </Text>
           <View style={[s.valorCard, { borderColor: tipoAtual.cor }]}>
             <Text style={[s.valorPrefixo, { color: tipoAtual.cor }]}>R$</Text>
             <TextInput
@@ -342,7 +424,11 @@ export default function NovoLancamentoScreen({ navigation, route }) {
         {/* Data */}
         <View style={s.bloco}>
           <Text style={s.blocoTitulo}>
-            {isPreco ? "Data de referência" : "Data"}
+            {isPreco
+              ? "Data de referência"
+              : isSaldoInicial
+                ? "Data-base do saldo"
+                : "Data"}
           </Text>
           <TouchableOpacity
             style={[
@@ -370,23 +456,94 @@ export default function NovoLancamentoScreen({ navigation, route }) {
         {!isPreco && (
           <>
             <View style={s.bloco}>
-              <Text style={s.blocoTitulo}>Categoria</Text>
-              {categoriasFiltradas.length === 0 ? (
+              <Text style={s.blocoTitulo}>Conta</Text>
+              {contas.length ? (
+                <>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={s.tiposRow}
+                  >
+                    {contas.map((conta) => {
+                      const ativa = conta.id_conta === idConta;
+                      return (
+                        <TouchableOpacity
+                          key={conta.id_conta}
+                          style={[
+                            s.tipoChip,
+                            ativa && {
+                              backgroundColor: tipoAtual.bg,
+                              borderColor: tipoAtual.cor,
+                            },
+                          ]}
+                          onPress={() => setIdConta(conta.id_conta)}
+                        >
+                          <Text
+                            style={[
+                              s.tipoChipTexto,
+                              ativa && { color: tipoAtual.cor },
+                            ]}
+                          >
+                            {conta.nome}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                  {contas.find((conta) => conta.id_conta === idConta)
+                    ?.saldo_inicial_configurado ? (
+                    <Text style={s.contaSaldo}>
+                      Saldo atual: R$ {Number(
+                        contas.find((conta) => conta.id_conta === idConta)
+                          ?.saldo_atual ?? 0,
+                      )
+                        .toFixed(2)
+                        .replace(".", ",")}
+                    </Text>
+                  ) : (
+                    <View>
+                      <Text style={s.contaSaldoPendente}>
+                        Saldo inicial não informado. Você pode lançar movimentos normalmente.
+                      </Text>
+                      {!isSaldoInicial && (
+                        <TouchableOpacity
+                          style={s.gerenciarContas}
+                          onPress={() => trocarTipo("saldo_inicial")}
+                        >
+                          <Text style={s.gerenciarContasTexto}>
+                            Informar saldo inicial
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+                </>
+              ) : (
                 <View style={s.vazioCard}>
-                  <Text style={s.vazioTitulo}>
-                    Nenhuma categoria disponível
-                  </Text>
                   <Text style={s.vazioTexto}>
-                    Não existem categorias para este tipo.
+                    Cadastre uma conta e informe o saldo que havia nela na data-base.
                   </Text>
                 </View>
-              ) : (
+              )}
+              <TouchableOpacity
+                style={s.gerenciarContas}
+                onPress={() => navigation.navigate("Contas")}
+              >
+                <Text style={s.gerenciarContasTexto}>
+                  {contas.length ? "Gerenciar contas e saldos" : "Cadastrar conta"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {!isSaldoInicial && CLASSIFICACOES_POR_TIPO[tipo]?.length > 1 && (
+              <View style={s.bloco}>
+                <Text style={s.blocoTitulo}>Classificação no DRE</Text>
                 <View style={s.listaCategorias}>
-                  {categoriasFiltradas.map((categoria) => {
-                    const ativa = categoria.id_categoria === idCategoria;
+                  {CLASSIFICACOES_POR_TIPO[tipo].map((classificacao) => {
+                    const ativa = classificacaoDre === classificacao;
                     return (
                       <TouchableOpacity
-                        key={categoria.id_categoria}
+                        key={classificacao}
                         style={[
                           s.categoriaItem,
                           ativa && {
@@ -394,7 +551,7 @@ export default function NovoLancamentoScreen({ navigation, route }) {
                             backgroundColor: tipoAtual.bg,
                           },
                         ]}
-                        onPress={() => setIdCategoria(categoria.id_categoria)}
+                        onPress={() => setClassificacaoDre(classificacao)}
                       >
                         <Text
                           style={[
@@ -405,45 +562,104 @@ export default function NovoLancamentoScreen({ navigation, route }) {
                             },
                           ]}
                         >
-                          {categoria.nome}
+                          {CLASSIFICACOES_DRE[classificacao]}
                         </Text>
-                        {ativa && (
-                          <Text
-                            style={[
-                              s.categoriaStatus,
-                              { color: tipoAtual.cor },
-                            ]}
-                          >
-                            Selecionada
-                          </Text>
-                        )}
                       </TouchableOpacity>
                     );
                   })}
                 </View>
-              )}
-            </View>
+              </View>
+            )}
 
-            <View style={s.bloco}>
-              <Text style={s.blocoTitulo}>Descrição</Text>
-              <TextInput
-                style={s.descricaoInput}
-                placeholder="Adicione uma descrição opcional"
-                placeholderTextColor="#CBD5E1"
-                value={descricao}
-                onChangeText={setDescricao}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-            </View>
+            {!isSaldoInicial && (
+              <View style={s.bloco}>
+                <Text style={s.blocoTitulo}>Categoria</Text>
+                {categoriasFiltradas.length === 0 ? (
+                  <View style={s.vazioCard}>
+                    <Text style={s.vazioTitulo}>
+                      Nenhuma categoria disponível
+                    </Text>
+                    <Text style={s.vazioTexto}>
+                      Não existem categorias para este tipo.
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={s.listaCategorias}>
+                    {categoriasFiltradas.map((categoria) => {
+                      const ativa = categoria.id_categoria === idCategoria;
+                      return (
+                        <TouchableOpacity
+                          key={categoria.id_categoria}
+                          style={[
+                            s.categoriaItem,
+                            ativa && {
+                              borderColor: tipoAtual.cor,
+                              backgroundColor: tipoAtual.bg,
+                            },
+                          ]}
+                          onPress={() => setIdCategoria(categoria.id_categoria)}
+                        >
+                          <Text
+                            style={[
+                              s.categoriaTexto,
+                              ativa && {
+                                color: tipoAtual.cor,
+                                fontWeight: "700",
+                              },
+                            ]}
+                          >
+                            {categoria.nome}
+                          </Text>
+                          {ativa && (
+                            <Text
+                              style={[
+                                s.categoriaStatus,
+                                { color: tipoAtual.cor },
+                              ]}
+                            >
+                              Selecionada
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            )}
+
+            {!isSaldoInicial && (
+              <View style={s.bloco}>
+                <Text style={s.blocoTitulo}>Descrição</Text>
+                <TextInput
+                  style={s.descricaoInput}
+                  placeholder="Adicione uma descrição opcional"
+                  placeholderTextColor="#CBD5E1"
+                  value={descricao}
+                  onChangeText={setDescricao}
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                />
+              </View>
+            )}
 
             {/* Resumo */}
-            <View style={s.bloco}>
+            {!isSaldoInicial && <View style={s.bloco}>
               <Text style={s.blocoTitulo}>Resumo</Text>
               <View style={s.resumoCard}>
                 {[
                   { label: "Tipo", valor: tipoAtual.label },
+                  {
+                    label: "Conta",
+                    valor:
+                      contas.find((conta) => conta.id_conta === idConta)?.nome ||
+                      "Não selecionada",
+                  },
+                  {
+                    label: "Classificação DRE",
+                    valor: CLASSIFICACOES_DRE[classificacaoDre],
+                  },
                   {
                     label: "Valor",
                     valor: valor ? `R$ ${valor}` : "Não informado",
@@ -479,7 +695,7 @@ export default function NovoLancamentoScreen({ navigation, route }) {
                   </View>
                 ))}
               </View>
-            </View>
+            </View>}
           </>
         )}
 
@@ -497,7 +713,11 @@ export default function NovoLancamentoScreen({ navigation, route }) {
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={s.botaoSalvarTexto}>
-              {isPreco ? "Registrar preço" : "Salvar lançamento"}
+              {isPreco
+                ? "Registrar preço"
+                : isSaldoInicial
+                  ? "Salvar saldo inicial"
+                  : "Salvar lançamento"}
             </Text>
           )}
         </TouchableOpacity>
@@ -584,6 +804,10 @@ const s = StyleSheet.create({
     paddingVertical: 11,
   },
   tipoChipTexto: { color: "#64748B", fontSize: 14, fontWeight: "600" },
+  contaSaldo: { color: "#64748B", fontSize: 12, marginTop: 8, marginLeft: 4 },
+  contaSaldoPendente: { color: "#B45309", fontSize: 12, marginTop: 8, marginLeft: 4 },
+  gerenciarContas: { alignSelf: "flex-start", paddingVertical: 8, paddingHorizontal: 4 },
+  gerenciarContasTexto: { color: "#2660A4", fontSize: 13, fontWeight: "700" },
 
   campoTexto: {
     backgroundColor: "#fff",

@@ -37,7 +37,7 @@ export default function PrecosMediosScreen({ navigation }) {
   const [carregando, setCarregando] = useState(true);
   const [produtos, setProdutos] = useState([]);
   const [categoriaAtiva, setCategoriaAtiva] = useState("Todos");
-  const [nomeSelecionado, setNomeSelecionado] = useState(null); // ← guarda só o nome
+  const [nomeSelecionado, setNomeSelecionado] = useState(null);
   const [categoriasDisponiveis, setCategoriasDisponiveis] = useState(["Todos"]);
 
   useFocusEffect(
@@ -55,7 +55,6 @@ export default function PrecosMediosScreen({ navigation }) {
       const cats = ["Todos", ...new Set(data.map((p) => p.categoria))];
       setCategoriasDisponiveis(cats);
 
-      // Seleciona o primeiro só se ainda não tiver nenhum selecionado
       if (data.length > 0) {
         setNomeSelecionado((prev) => prev ?? data[0].nome);
       }
@@ -66,7 +65,6 @@ export default function PrecosMediosScreen({ navigation }) {
     }
   }
 
-  // Deriva o objeto do produto selecionado sempre a partir da lista atual
   const produtoSelecionado =
     produtos.find((p) => p.nome === nomeSelecionado) ?? null;
 
@@ -284,7 +282,15 @@ export default function PrecosMediosScreen({ navigation }) {
                 <Text style={s.historicoTitulo}>Histórico de registros</Text>
                 {produtoSelecionado.historico.map((h) => (
                   <View key={h.id_preco} style={s.historicoLinha}>
-                    <Text style={s.historicoMes}>{h.mes}</Text>
+                    <Text style={s.historicoMes}>
+                      {new Date(h.data_referencia + "T12:00:00")
+                        .toLocaleDateString("pt-BR", {
+                          month: "short",
+                          year: "numeric",
+                        })
+                        .replace(". de ", "/")
+                        .replace(".", "")}
+                    </Text>
                     <Text style={s.historicoValor}>{fmt(h.preco)}</Text>
                     <TouchableOpacity
                       onPress={() =>
@@ -313,7 +319,7 @@ export default function PrecosMediosScreen({ navigation }) {
 
             return (
               <TouchableOpacity
-                key={produto.id}
+                key={produto.nome}
                 style={[s.item, selecionado && s.itemSelecionado]}
                 onPress={() => setNomeSelecionado(produto.nome)}
                 activeOpacity={0.75}
@@ -496,14 +502,15 @@ const s = StyleSheet.create({
     borderRadius: 14,
     marginHorizontal: 16,
     marginBottom: 8,
-    overflow: "hidden",
+    borderWidth: 1.5,
+    borderColor: "transparent",
     shadowColor: "#000",
     shadowOpacity: 0.04,
     shadowRadius: 6,
     elevation: 2,
   },
-  itemSelecionado: { borderWidth: 1.5, borderColor: AZUL },
-  itemAccent: { width: 4, alignSelf: "stretch" },
+  itemSelecionado: { borderColor: AZUL },
+  itemAccent: { width: 4, alignSelf: "stretch", borderRadius: 2 },
   itemInfo: { flex: 1, paddingHorizontal: 12, paddingVertical: 14 },
   itemNome: { fontSize: 14, fontWeight: "600", color: PRETO },
   itemCategoria: { fontSize: 12, color: "#94A3B8", marginTop: 2 },

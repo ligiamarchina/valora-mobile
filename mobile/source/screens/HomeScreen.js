@@ -25,9 +25,10 @@ const CATEGORIAS = [
   { key: 'investimento', nome: 'Investimentos', cor: '#CA8A04', bg: '#FEF3C7', textoCor: '#92400E' },
 ];
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }) { // FIX: recebe navigation
   const { usuario, logout } = useAuth();
   const [resumo, setResumo] = useState(null);
+  const [contas, setContas] = useState([]);
   const [carregando, setCarregando] = useState(true);
 
   const carregar = useCallback(async () => {
@@ -41,11 +42,13 @@ export default function HomeScreen() {
       const ultimoDia = new Date(ano, hoje.getMonth() + 1, 0).getDate();
       const fim = `${ano}-${mes}-${ultimoDia}`;
 
-      const { data } = await api.get(
-        `/relatorios/fluxo-de-caixa?data_inicio=${inicio}&data_fim=${fim}`
-      );
+      const [fluxo, respostaContas] = await Promise.all([
+        api.get(`/relatorios/fluxo-de-caixa?data_inicio=${inicio}&data_fim=${fim}`),
+        api.get('/contas'),
+      ]);
 
-      setResumo(data);
+      setResumo(fluxo.data);
+      setContas(respostaContas.data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -61,6 +64,12 @@ export default function HomeScreen() {
 
   const fmt = (v) => `R$ ${(v ?? 0).toFixed(2).replace('.', ',')}`;
   const saldoPositivo = (resumo?.saldo ?? 0) >= 0;
+  const saldoContas = contas.reduce(
+    (total, conta) => total + Number(conta.saldo_atual || 0),
+    0,
+  );
+  const saldoContasConfigurado =
+    contas.length > 0 && contas.every((conta) => conta.saldo_inicial_configurado);
 
   const dadosGrafico = CATEGORIAS
     .map((cat) => ({
@@ -87,9 +96,20 @@ export default function HomeScreen() {
           <Text style={s.sub}>Resumo financeiro do mês atual</Text>
         </View>
 
-        <TouchableOpacity onPress={logout} style={s.sairBotao}>
-          <Text style={s.sair}>Sair</Text>
-        </TouchableOpacity>
+        {/* FIX: grupo de botões do header — alertas + sair */}
+        <View style={s.headerBotoes}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Alertas')}
+            style={s.alertasBotao}
+          >
+            <View style={s.alertasIcone} />
+            <Text style={s.alertasTexto}>Alertas</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={logout} style={s.sairBotao}>
+            <Text style={s.sair}>Sair</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {carregando ? (
@@ -214,6 +234,28 @@ export default function HomeScreen() {
               </View>
             )}
           </View>
+
+          <TouchableOpacity
+            style={s.contasSaldoCard}
+            onPress={() => navigation.navigate('Contas')}
+            accessibilityRole="button"
+            accessibilityLabel={saldoContasConfigurado
+              ? `Saldo atual nas contas: ${fmt(saldoContas)}. Abrir contas`
+              : 'Configure o saldo inicial das contas'}
+          >
+            <View style={s.contasSaldoInfo}>
+              <Text style={s.contasSaldoLabel}>Saldo atual nas contas</Text>
+              <Text style={s.contasSaldoValor}>
+                {saldoContasConfigurado ? fmt(saldoContas) : 'Configuração pendente'}
+              </Text>
+              <Text style={s.contasSaldoAjuda}>
+                {saldoContasConfigurado
+                  ? 'Entradas e saídas desde a data-base'
+                  : 'Informe saldo inicial e data-base'}
+              </Text>
+            </View>
+            <Text style={s.contasSaldoAcao}>Contas ›</Text>
+          </TouchableOpacity>
         </>
       )}
     </ScrollView>
@@ -233,6 +275,26 @@ const s = StyleSheet.create({
   headerInfo: { flex: 1, paddingRight: 12 },
   ola: { fontSize: 22, fontWeight: 'bold', color: '#fff' },
   sub: { fontSize: 13, color: 'rgba(255,255,255,0.82)', marginTop: 4 },
+
+  // FIX: novos estilos do botão de alertas
+  headerBotoes: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  alertasBotao: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  alertasIcone: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: '#FCD34D',
+  },
+  alertasTexto: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
+
   sairBotao: {
     backgroundColor: 'rgba(255,255,255,0.18)',
     paddingHorizontal: 14,
@@ -290,6 +352,25 @@ const s = StyleSheet.create({
     color: '#fff',
     textAlign: 'center',
   },
+
+  contasSaldoCard: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D8E5E3',
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  contasSaldoInfo: { flex: 1 },
+  contasSaldoLabel: { fontSize: 12, color: '#64748B', fontWeight: '600' },
+  contasSaldoValor: { fontSize: 22, color: '#0F766E', fontWeight: '700', marginTop: 4 },
+  contasSaldoAjuda: { fontSize: 11, color: '#94A3B8', marginTop: 3 },
+  contasSaldoAcao: { color: '#2660A4', fontSize: 12, fontWeight: '700' },
 
   secao: {
     backgroundColor: '#fff',

@@ -5,6 +5,13 @@ const { autenticar } = require('../middleware/auth');
 const router = express.Router();
 router.use(autenticar);
 
+const CLASSIFICACOES_POR_TIPO = {
+  receita: ['receita_bruta', 'receita_financeira'],
+  despesa: ['deducao_receita', 'despesa_operacional', 'despesa_financeira', 'imposto_lucro'],
+  custo: ['custo'],
+  investimento: ['investimento'],
+};
+
 // GET /lancamentos
 router.get('/', async (req, res) => {
   const { tipo, data_inicio, data_fim, id_categoria } = req.query;
@@ -14,7 +21,9 @@ router.get('/', async (req, res) => {
     let query = supabase
       .from('lancamento_financeiro')
       .select(`id_lancamento, tipo, valor, data_lancamento, descricao, criado_em,
-        categoria ( id_categoria, nome, tipo )`)
+        id_conta, classificacao_dre,
+        categoria ( id_categoria, nome, tipo ),
+        conta_financeira ( id_conta, nome )`)
       .eq('id_mei', id_mei)
       .order('data_lancamento', { ascending: false });
 
@@ -54,7 +63,15 @@ router.get('/:id', async (req, res) => {
 
 // POST /lancamentos
 router.post('/', async (req, res) => {
-  const { tipo, valor, data_lancamento, descricao, id_categoria } = req.body;
+  const {
+    tipo,
+    valor,
+    data_lancamento,
+    descricao,
+    id_categoria,
+    id_conta,
+    classificacao_dre,
+  } = req.body;
   const id_mei = req.usuario.id_mei;
 
   if (!tipo || !valor || !data_lancamento) {
@@ -64,11 +81,33 @@ router.post('/', async (req, res) => {
   if (!['receita', 'despesa', 'investimento', 'custo'].includes(tipo)) {
     return res.status(400).json({ erro: 'Tipo inválido. Use: receita, despesa, investimento ou custo.' });
   }
+  if (!id_conta || !CLASSIFICACOES_POR_TIPO[tipo]?.includes(classificacao_dre)) {
+    return res.status(400).json({ erro: 'Selecione uma conta e uma classificação DRE compatível com o tipo.' });
+  }
 
   try {
+    const { data: conta, error: erroConta } = await supabase
+      .from('conta_financeira')
+      .select('id_conta')
+      .eq('id_conta', id_conta)
+      .eq('id_mei', id_mei)
+      .maybeSingle();
+
+    if (erroConta) throw erroConta;
+    if (!conta) return res.status(400).json({ erro: 'Conta inválida.' });
+
     const { data, error } = await supabase
       .from('lancamento_financeiro')
-      .insert({ id_mei, tipo, valor, data_lancamento, descricao, id_categoria })
+      .insert({
+        id_mei,
+        tipo,
+        valor,
+        data_lancamento,
+        descricao,
+        id_categoria,
+        id_conta,
+        classificacao_dre,
+      })
       .select()
       .single();
 
@@ -83,7 +122,15 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
   const id_mei = req.usuario.id_mei;
-  const { tipo, valor, data_lancamento, descricao, id_categoria } = req.body;
+  const {
+    tipo,
+    valor,
+    data_lancamento,
+    descricao,
+    id_categoria,
+    id_conta,
+    classificacao_dre,
+  } = req.body;
 
   try {
     const { data: existente } = await supabase
@@ -95,9 +142,34 @@ router.put('/:id', async (req, res) => {
 
     if (!existente) return res.status(404).json({ erro: 'Lançamento não encontrado.' });
 
+    if (tipo && !CLASSIFICACOES_POR_TIPO[tipo]?.includes(classificacao_dre)) {
+      return res.status(400).json({ erro: 'Classificação DRE incompatível com o tipo.' });
+    }
+
+    if (id_conta) {
+      const { data: conta, error: erroConta } = await supabase
+        .from('conta_financeira')
+        .select('id_conta')
+        .eq('id_conta', id_conta)
+        .eq('id_mei', id_mei)
+        .maybeSingle();
+
+      if (erroConta) throw erroConta;
+      if (!conta) return res.status(400).json({ erro: 'Conta inválida.' });
+    }
+
     const { data, error } = await supabase
       .from('lancamento_financeiro')
-      .update({ tipo, valor, data_lancamento, descricao, id_categoria, atualizado_em: new Date() })
+      .update({
+        tipo,
+        valor,
+        data_lancamento,
+        descricao,
+        id_categoria,
+        id_conta,
+        classificacao_dre,
+        atualizado_em: new Date(),
+      })
       .eq('id_lancamento', id)
       .select()
       .single();

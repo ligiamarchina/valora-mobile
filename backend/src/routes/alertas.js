@@ -1,8 +1,134 @@
 const express = require('express');
 const supabase = require('../config/supabase');
 const { autenticar } = require('../middleware/auth');
+const { enviarPush } = require('../utils/expoPush');
 
 const router = express.Router();
+
+// ─────────────────────────────────────────
+// Lógica central de verificação de alertas.
+// Reaproveitada pela rota /verificar (manual,
+// chamada pelo app) e pela rota /cron/verificar-alertas
+// (automática, chamada por um agendador externo).
+// ─────────────────────────────────────────
+async function verificarAlertasDoMei(id_mei) {
+  const { data: alertas } = await supabase
+    .from('alerta_financeiro')
+    .select('*')
+    .eq('id_mei', id_mei)
+    .eq('ativo', true);
+
+  if (!alertas || alertas.length === 0) {
+    return { alertas_verificados: 0, notificacoes_geradas: 0, notificacoes: [] };
+  }
+
+  const hoje = new Date();
+  const mesAtual = hoje.getMonth() + 1; // 1-12
+  const inicioMes = `${hoje.getFullYear()}-${String(mesAtual).padStart(2, '0')}-01`;
+  const inicioAno = `${hoje.getFullYear()}-01-01`;
+
+  // FIX: uma única query cobre o ano inteiro (usada tanto pro total do mês quanto do ano)
+  const { data: lancamentosAno } = await supabase
+    .from('lancamento_financeiro')
+    .select('valor, tipo, data_lancamento')
+    .eq('id_mei', id_mei)
+    .gte('data_lancamento', inicioAno);
+
+  const totalDespesasMes = (lancamentosAno || [])
+    .filter((l) => l.tipo === 'despesa' && l.data_lancamento >= inicioMes)
+    .reduce((acc, l) => acc + parseFloat(l.valor), 0);
+
+  const totalFaturamentoAno = (lancamentosAno || [])
+    .filter((l) => l.tipo === 'receita')
+    .reduce((acc, l) => acc + parseFloat(l.valor), 0);
+
+  const notificacoesGeradas = [];
+
+  for (const alerta of alertas) {
+    let disparar = false;
+    let mensagem = '';
+    // FIX: duplicidade checada por MÊS — permite disparar de novo no mês seguinte
+    const referenciaPeriodo = inicioMes;
+
+    if (alerta.tipo_alerta === 'limite_despesa') {
+      if (totalDespesasMes >= alerta.valor_referencia) {
+        disparar = true;
+        mensagem = `⚠️ Suas despesas esse mês atingiram R$ ${totalDespesasMes
+          .toFixed(2)
+          .replace('.', ',')}, ultrapassando o limite de R$ ${parseFloat(alerta.valor_referencia)
+          .toFixed(2)
+          .replace('.', ',')}.`;
+      }
+    }
+
+    // FIX: novo tipo — teto anual do MEI, verificado proporcionalmente por mês
+    if (alerta.tipo_alerta === 'limite_faturamento') {
+      const cotaMensal = alerta.valor_referencia / 12;
+      const cotaAcumulada = cotaMensal * mesAtual;
+
+      if (totalFaturamentoAno >= cotaAcumulada) {
+        disparar = true;
+        const percentualDoTeto = (totalFaturamentoAno / alerta.valor_referencia) * 100;
+        const projecaoAnual = (totalFaturamentoAno / mesAtual) * 12;
+
+        mensagem = `📊 Até o mês ${mesAtual}, seu faturamento acumulado é R$ ${totalFaturamentoAno
+          .toFixed(2)
+          .replace('.', ',')} (${percentualDoTeto.toFixed(0)}% do teto anual do MEI de R$ ${parseFloat(
+          alerta.valor_referencia
+        )
+          .toFixed(2)
+          .replace('.', ',')}). No ritmo atual, projeção de fechamento do ano: R$ ${projecaoAnual
+          .toFixed(2)
+          .replace('.', ',')}.`;
+      }
+    }
+
+    if (!disparar) continue;
+
+    // não duplica notificação não lida no mesmo período
+    const { data: jaExiste } = await supabase
+      .from('notificacao')
+      .select('id_notificacao')
+      .eq('id_alerta', alerta.id_alerta)
+      .eq('lida', false)
+      .gte('enviado_em', referenciaPeriodo)
+      .maybeSingle();
+
+    if (jaExiste) continue;
+
+    const { data: notif } = await supabase
+      .from('notificacao')
+      .insert({ id_alerta: alerta.id_alerta, mensagem })
+      .select()
+      .single();
+
+    notificacoesGeradas.push(notif);
+  }
+
+  // FIX: envia push para os dispositivos do MEI se alguma notificação foi gerada
+  if (notificacoesGeradas.length > 0) {
+    const { data: dispositivos } = await supabase
+      .from('dispositivo_push')
+      .select('expo_push_token')
+      .eq('id_mei', id_mei);
+
+    const tokens = (dispositivos || []).map((d) => d.expo_push_token);
+
+    for (const notif of notificacoesGeradas) {
+      await enviarPush(tokens, 'Alerta financeiro', notif.mensagem, {
+        id_alerta: notif.id_alerta,
+        id_notificacao: notif.id_notificacao,
+      });
+    }
+  }
+
+  return {
+    alertas_verificados: alertas.length,
+    notificacoes_geradas: notificacoesGeradas.length,
+    notificacoes: notificacoesGeradas,
+  };
+}
+
 router.use(autenticar);
 
 // ─────────────────────────────────────────
@@ -35,7 +161,12 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ erro: 'tipo_alerta é obrigatório.' });
   }
 
-  // FIX: validação de valor_referencia no backend
+  // FIX: tipo_alerta precisa ser um dos suportados
+  const TIPOS_VALIDOS = ['limite_despesa', 'limite_faturamento'];
+  if (!TIPOS_VALIDOS.includes(tipo_alerta)) {
+    return res.status(400).json({ erro: `tipo_alerta deve ser um de: ${TIPOS_VALIDOS.join(', ')}.` });
+  }
+
   if (
     valor_referencia === undefined ||
     valor_referencia === null ||
@@ -45,13 +176,18 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ erro: 'valor_referencia deve ser um número positivo.' });
   }
 
+  const descricaoPadrao =
+    tipo_alerta === 'limite_faturamento'
+      ? 'Alerta de teto de faturamento MEI'
+      : 'Alerta de limite de despesas';
+
   try {
     const { data, error } = await supabase
       .from('alerta_financeiro')
       .insert({
         id_mei,
         tipo_alerta,
-        descricao: descricao?.trim() || 'Alerta de limite de despesas',
+        descricao: descricao?.trim() || descricaoPadrao,
         valor_referencia: Number(valor_referencia),
       })
       .select()
@@ -66,7 +202,6 @@ router.post('/', async (req, res) => {
 
 // ─────────────────────────────────────────
 // ROTAS ESTÁTICAS — devem vir ANTES de /:id
-// FIX: ordem corrigida para evitar conflito com /:id
 // ─────────────────────────────────────────
 
 // GET /alertas/notificacoes
@@ -75,12 +210,12 @@ router.get('/notificacoes', async (req, res) => {
   const { lida } = req.query;
 
   try {
-    const { data: alertas } = await supabase
+    const { data: alertasDoMei } = await supabase
       .from('alerta_financeiro')
       .select('id_alerta')
       .eq('id_mei', id_mei);
 
-    const ids = alertas.map((a) => a.id_alerta);
+    const ids = alertasDoMei.map((a) => a.id_alerta);
     if (ids.length === 0) return res.json([]);
 
     let query = supabase
@@ -118,78 +253,12 @@ router.patch('/notificacoes/:id/lida', async (req, res) => {
   }
 });
 
-// POST /alertas/verificar
+// POST /alertas/verificar — chamado pelo app (useFocusEffect)
 router.post('/verificar', async (req, res) => {
   const id_mei = req.usuario.id_mei;
-
   try {
-    const { data: alertas } = await supabase
-      .from('alerta_financeiro')
-      .select('*')
-      .eq('id_mei', id_mei)
-      .eq('ativo', true);
-
-    if (!alertas || alertas.length === 0) {
-      return res.json({
-        alertas_verificados: 0,
-        notificacoes_geradas: 0,
-        notificacoes: [],
-      });
-    }
-
-    const hoje = new Date();
-    const inicioMes = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`;
-
-    // FIX: uma única query para todos os lançamentos do mês (evita N+1)
-    const { data: lancamentosMes } = await supabase
-      .from('lancamento_financeiro')
-      .select('valor, tipo')
-      .eq('id_mei', id_mei)
-      .gte('data_lancamento', inicioMes);
-
-    const totalDespesas = (lancamentosMes || [])
-      .filter((l) => l.tipo === 'despesa')
-      .reduce((acc, l) => acc + parseFloat(l.valor), 0);
-
-    const notificacoesGeradas = [];
-
-    for (const alerta of alertas) {
-      let disparar = false;
-      let mensagem = '';
-
-      if (alerta.tipo_alerta === 'limite_despesa') {
-        if (totalDespesas >= alerta.valor_referencia) {
-          // FIX: checa se já existe notificação não lida para esse alerta no mês
-          const { data: jaExiste } = await supabase
-            .from('notificacao')
-            .select('id_notificacao')
-            .eq('id_alerta', alerta.id_alerta)
-            .eq('lida', false)
-            .gte('enviado_em', inicioMes)
-            .maybeSingle();
-
-          if (jaExiste) continue; // Não duplica
-
-          disparar = true;
-          mensagem = `⚠️ Suas despesas esse mês atingiram R$ ${totalDespesas.toFixed(2).replace('.', ',')}, ultrapassando o limite de R$ ${parseFloat(alerta.valor_referencia).toFixed(2).replace('.', ',')}.`;
-        }
-      }
-
-      if (disparar) {
-        const { data: notif } = await supabase
-          .from('notificacao')
-          .insert({ id_alerta: alerta.id_alerta, mensagem })
-          .select()
-          .single();
-        notificacoesGeradas.push(notif);
-      }
-    }
-
-    return res.json({
-      alertas_verificados: alertas.length,
-      notificacoes_geradas: notificacoesGeradas.length,
-      notificacoes: notificacoesGeradas,
-    });
+    const resultado = await verificarAlertasDoMei(id_mei);
+    return res.json(resultado);
   } catch (err) {
     return res.status(500).json({ erro: 'Erro ao verificar alertas.' });
   }
@@ -248,3 +317,4 @@ router.delete('/:id', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.verificarAlertasDoMei = verificarAlertasDoMei;
