@@ -18,6 +18,7 @@ app.use(express.json());
 app.use("/auth", authRoutes);
 app.use("/lancamentos", lancamentosRoutes);
 app.use("/relatorios", relatoriosRoutes);
+app.use("/contas", require("./routes/contas"));
 app.use("/alertas", alertasRoutes);
 app.use("/categorias", categoriasRoutes);
 app.use("/precos-medios", precosRoutes);

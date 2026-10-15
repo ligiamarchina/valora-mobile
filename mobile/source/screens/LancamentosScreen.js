@@ -133,6 +133,9 @@ export default function LancamentosScreen({ navigation }) {
             {item.descricao || item.categoria?.nome || LABELS[item.tipo]}
           </Text>
           <Text style={s.itemCategoria}>{item.categoria?.nome}</Text>
+          <Text style={s.itemConta}>
+            {item.conta_financeira?.nome || "Conta não identificada"}
+          </Text>
           <Text style={s.itemData}>
             {new Date(item.data_lancamento + "T12:00:00").toLocaleDateString(
               "pt-BR",
@@ -510,6 +513,7 @@ const s = StyleSheet.create({
   itemInfo: { flex: 1, paddingHorizontal: 10, paddingVertical: 14 },
   itemDesc: { fontSize: 14, color: PRETO, fontWeight: "600" },
   itemCategoria: { fontSize: 12, color: "#64748B", marginTop: 2 },
+  itemConta: { fontSize: 11, color: "#0F766E", marginTop: 2 },
   itemData: { fontSize: 11, color: "#94A3B8", marginTop: 2 },
   itemDireita: {
     alignItems: "flex-end",

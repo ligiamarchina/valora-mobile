@@ -13,6 +13,8 @@ import PrecosMediosScreen from "../screens/PrecosMediosScreen";
 import NotasScreen from "../screens/NotasScreen";
 import NovaNotaFiscalScreen from "../screens/NovaNotaFiscalScreen";
 import AlertasScreen from "../screens/AlertasScreen"; // FIX: novo import
+import DreScreen from "../screens/DreScreen";
+import ContasScreen from "../screens/ContasScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -91,6 +93,20 @@ function TabsAutenticadas() {
           ),
         }}
       />
+      <Tab.Screen
+        name="DRE"
+        component={DreScreen}
+        options={{
+          tabBarLabel: "DRE",
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? "calculator" : "calculator-outline"}
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
     </Tab.Navigator>
   );
 }
@@ -112,6 +128,7 @@ export default function Navigation() {
               name="NovaNotaFiscal"
               component={NovaNotaFiscalScreen}
             />
+            <Stack.Screen name="Contas" component={ContasScreen} />
             {/* FIX: Alertas acessível via botão na Home, fora das tabs */}
             <Stack.Screen name="Alertas" component={AlertasScreen} />
           </>
